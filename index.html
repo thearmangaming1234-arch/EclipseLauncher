@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Eclipse Client Launcher</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0f0f12;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+            -webkit-app-region: drag;
+        }
+
+        .container {
+            -webkit-app-region: no-drag;
+            text-align: center;
+            background: #18181c;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
+            border: 1px solid #2a2a30;
+            width: 320px;
+        }
+
+        h1 {
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+            color: #ffffff;
+            font-size: 24px;
+        }
+
+        input {
+            width: 90%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #0a0a0c;
+            color: white;
+            text-align: center;
+            font-size: 15px;
+            outline: none;
+        }
+
+        button {
+            width: 98%;
+            padding: 12px;
+            background: linear-gradient(135deg, #6366f1, #3b82f6);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>ECLIPSE CLIENT</h1>
+        <input type="text" id="username" placeholder="Enter Username" value="Player">
+        <button id="playBtn">PLAY</button>
+        <div id="status">Ready to launch</div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const playBtn = document.getElementById('playBtn');
+        const usernameInput = document.getElementById('username');
+        const status = document.getElementById('status');
+
+        playBtn.addEventListener('click', () => {
+            const username = usernameInput.value || "Player";
+            status.innerText = "Syncing assets...";
+            ipcRenderer.send('launch-game', username);
+        });
+
+        ipcRenderer.on('launch-progress', (event, progress) => {
+            if (progress.type === 'status') {
+                status.innerText = progress.task;
+            } else if (progress.percentage !== undefined) {
+                status.innerText = `Verifying files: ${progress.percentage}%`;
+            } else if (progress.total && progress.total > 0) {
+                const percent = Math.round((progress.task / progress.total) * 100);
+                status.innerText = `Verifying files: ${percent}%`;
+            } else {
+                status.innerText = "Verifying files...";
+            }
+        });
+    </script>
+</body>
+</html>

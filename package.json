@@ -1,0 +1,39 @@
+{
+  "name": "eclipse-launcher",
+  "version": "1.0.0",
+  "description": "Custom Eclipse Client Launcher",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thearmangaming1234-arch/EclipseLauncher.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.eclipse.launcher",
+    "productName": "Eclipse Launcher",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "thearmangaming1234-arch",
+        "repo": "EclipseLauncher"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "fs-extra": "^11.2.0",
+    "minecraft-launcher-core": "^3.12.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3"
+  }
+}
