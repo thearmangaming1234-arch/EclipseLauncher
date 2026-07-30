@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
+    "manifest": "node generate-manifest.js",
     "dist": "electron-builder"
   },
   "build": {

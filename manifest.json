@@ -1,5 +1,1049 @@
 {
-  "version": "1.0.0",
-  "news": "Welcome to Eclipse Launcher! Everything is up to date.",
-  "files": []
+  "version": 1785433174162,
+  "files": [
+    {
+      "path": "config/badoptimizations.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/badoptimizations.txt"
+    },
+    {
+      "path": "config/builtinservers.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/builtinservers.json"
+    },
+    {
+      "path": "config/c2me.toml",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/c2me.toml"
+    },
+    {
+      "path": "config/chatpatches.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/chatpatches.json"
+    },
+    {
+      "path": "config/citresewn-defaults.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/citresewn-defaults.json"
+    },
+    {
+      "path": "config/citresewn.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/citresewn.json"
+    },
+    {
+      "path": "config/clearwater.jsonc",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/clearwater.jsonc"
+    },
+    {
+      "path": "config/collective.json5",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/collective.json5"
+    },
+    {
+      "path": "config/colors.toml",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/colors.toml"
+    },
+    {
+      "path": "config/commandkeys.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/commandkeys.json"
+    },
+    {
+      "path": "config/continuity.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/continuity.json"
+    },
+    {
+      "path": "config/craftpresence.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/craftpresence.json"
+    },
+    {
+      "path": "config/darkkore.toml",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/darkkore.toml"
+    },
+    {
+      "path": "config/drippyloadingscreen/options.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/drippyloadingscreen/options.txt"
+    },
+    {
+      "path": "config/dynamic_fps.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/dynamic_fps.json"
+    },
+    {
+      "path": "config/enhanced_bes.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/enhanced_bes.properties"
+    },
+    {
+      "path": "config/entityculling.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/entityculling.json"
+    },
+    {
+      "path": "config/fabric/indigo-renderer.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fabric/indigo-renderer.properties"
+    },
+    {
+      "path": "config/fancymenu/assets/activeeclipsesettingslogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/activeeclipsesettingslogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/autotextlogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/autotextlogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/badge.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/badge.png"
+    },
+    {
+      "path": "config/fancymenu/assets/crosshairlogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/crosshairlogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/eclipsesettings-square.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/eclipsesettings-square.png"
+    },
+    {
+      "path": "config/fancymenu/assets/f3llogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/f3llogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/freecamlogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/freecamlogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/freelooklogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/freelooklogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/game-intro-with-music.mp4",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/game-intro-with-music.mp4"
+    },
+    {
+      "path": "config/fancymenu/assets/inventoryhudlogo.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/inventoryhudlogo.png"
+    },
+    {
+      "path": "config/fancymenu/assets/logo-noback.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/logo-noback.png"
+    },
+    {
+      "path": "config/fancymenu/assets/logoeclipse-noback.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/logoeclipse-noback.png"
+    },
+    {
+      "path": "config/fancymenu/assets/scroll.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/assets/scroll.png"
+    },
+    {
+      "path": "config/fancymenu/customizablemenus.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customizablemenus.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/blocked_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/blocked_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/book_view_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/book_view_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/com.gitlab.cdagaming.craftpresence.config.gui.generalsettingsgui_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/com.gitlab.cdagaming.craftpresence.config.gui.generalsettingsgui_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/confirm_link_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/confirm_link_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/container_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/container_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/credits_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/credits_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/drippy_loading_overlay_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/drippy_loading_overlay_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/eclipse.mods_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/eclipse.mods_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/inventory_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/inventory_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/io.github.darkkronicle.kronhud.gui.screen.hudeditscreen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/io.github.darkkronicle.kronhud.gui.screen.hudeditscreen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/join_multiplayer_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/join_multiplayer_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/pause_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/pause_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/customization/title_screen_layout.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/customization/title_screen_layout.txt"
+    },
+    {
+      "path": "config/fancymenu/custom_gui_screens.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/custom_gui_screens.txt"
+    },
+    {
+      "path": "config/fancymenu/layout_editor/widgets/element_layer_control.lewidget",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/layout_editor/widgets/element_layer_control.lewidget"
+    },
+    {
+      "path": "config/fancymenu/legacy_checklist.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/legacy_checklist.txt"
+    },
+    {
+      "path": "config/fancymenu/options.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/options.txt"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/cherry_blossom.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/cherry_blossom.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/cozy_campfire.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/cozy_campfire.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/dark.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/dark.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/dark_high_contrast.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/dark_high_contrast.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/light.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/light.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/light_high_contrast.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/light_high_contrast.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/pumpkin_soup.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/pumpkin_soup.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/purple_void.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/purple_void.json"
+    },
+    {
+      "path": "config/fancymenu/ui_themes/spooky_season.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/ui_themes/spooky_season.json"
+    },
+    {
+      "path": "config/fancymenu/user_variables.db",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fancymenu/user_variables.db"
+    },
+    {
+      "path": "config/ferritecore.mixin.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/ferritecore.mixin.properties"
+    },
+    {
+      "path": "config/fpsreducer.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fpsreducer.json"
+    },
+    {
+      "path": "config/freecam.json5",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/freecam.json5"
+    },
+    {
+      "path": "config/fullbrightnesstoggle/laststate.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/fullbrightnesstoggle/laststate.txt"
+    },
+    {
+      "path": "config/ias.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/ias.json"
+    },
+    {
+      "path": "config/immediatelyfast.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/immediatelyfast.json"
+    },
+    {
+      "path": "config/indium-renderer.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/indium-renderer.properties"
+    },
+    {
+      "path": "config/inventoryhud.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/inventoryhud.json"
+    },
+    {
+      "path": "config/iris.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/iris.properties"
+    },
+    {
+      "path": "config/konkrete/locals/de_de.local",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/konkrete/locals/de_de.local"
+    },
+    {
+      "path": "config/konkrete/locals/en_us.local",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/konkrete/locals/en_us.local"
+    },
+    {
+      "path": "config/konkrete/locals/pl_pl.local",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/konkrete/locals/pl_pl.local"
+    },
+    {
+      "path": "config/konkrete/locals/pt_br.local",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/konkrete/locals/pt_br.local"
+    },
+    {
+      "path": "config/kronhud.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/kronhud.json"
+    },
+    {
+      "path": "config/lithium.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/lithium.properties"
+    },
+    {
+      "path": "config/modelfix-client.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/modelfix-client.json"
+    },
+    {
+      "path": "config/modernfix-mixins.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/modernfix-mixins.properties"
+    },
+    {
+      "path": "config/modmenu.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/modmenu.json"
+    },
+    {
+      "path": "config/paxi/resourcepacks/ECLIPS Essentials.zip",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/paxi/resourcepacks/ECLIPS Essentials.zip"
+    },
+    {
+      "path": "config/paxi/resourcepack_load_order.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/paxi/resourcepack_load_order.json"
+    },
+    {
+      "path": "config/resourceful-config-web.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/resourceful-config-web.json"
+    },
+    {
+      "path": "config/rrp.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/rrp.properties"
+    },
+    {
+      "path": "config/screenshotgallery.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/screenshotgallery.json"
+    },
+    {
+      "path": "config/simpleblockoverlay.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/simpleblockoverlay.json"
+    },
+    {
+      "path": "config/smoothswapping.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/smoothswapping.json"
+    },
+    {
+      "path": "config/sodium-extra-options.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/sodium-extra-options.json"
+    },
+    {
+      "path": "config/sodium-extra.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/sodium-extra.properties"
+    },
+    {
+      "path": "config/sodium-fingerprint.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/sodium-fingerprint.json"
+    },
+    {
+      "path": "config/sodium-mixins.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/sodium-mixins.properties"
+    },
+    {
+      "path": "config/sodium-options.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/sodium-options.json"
+    },
+    {
+      "path": "config/vmp.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/vmp.properties"
+    },
+    {
+      "path": "config/watermedia.toml",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/watermedia.toml"
+    },
+    {
+      "path": "config/yacl.json5",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/yacl.json5"
+    },
+    {
+      "path": "config/zoomify.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/zoomify.json"
+    },
+    {
+      "path": "crosshair_config.ccmcfg",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/crosshair_config.ccmcfg"
+    },
+    {
+      "path": "Eclipse Client.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse Client.jar"
+    },
+    {
+      "path": "Eclipse Client.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse Client.json"
+    },
+    {
+      "path": "fancymenu_data/action_favorites.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/action_favorites.json"
+    },
+    {
+      "path": "fancymenu_data/browser_audio_settings.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/browser_audio_settings.json"
+    },
+    {
+      "path": "fancymenu_data/browser_video_settings.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/browser_video_settings.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MDhlNjc5ZDktZGU0OS00YjU1LTllOTYtYjY5NTU3MjE0MzQ2LTE3ODUzNTE5NzQyNDM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MDhlNjc5ZDktZGU0OS00YjU1LTllOTYtYjY5NTU3MjE0MzQ2LTE3ODUzNTE5NzQyNDM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MGEwMTM5MDMtNjZkNi00ODgxLWE3YTItZTdlNTVkNjNkMTJiLTE3ODUyNjc1MTUzMDM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MGEwMTM5MDMtNjZkNi00ODgxLWE3YTItZTdlNTVkNjNkMTJiLTE3ODUyNjc1MTUzMDM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MjQyZGVjNWUtYjU0Yi00N2U1LTkzMzUtZTc1YjI5MTBjZDRkLTE3ODUyNzE4MTYyMDI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MjQyZGVjNWUtYjU0Yi00N2U1LTkzMzUtZTc1YjI5MTBjZDRkLTE3ODUyNzE4MTYyMDI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MjRkYTk4ZDYtNzgzMS00YWJiLTkyMWMtYzg5YmJiNDRmNzcwLTE3ODUyNzEwMzQ5MzQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MjRkYTk4ZDYtNzgzMS00YWJiLTkyMWMtYzg5YmJiNDRmNzcwLTE3ODUyNzEwMzQ5MzQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MWMzM2RiMzQtODYxZC00MWM3LWE3NzctMjU0MTc3MTc0MWUwLTE3ODUzMzI1MTkzMzY.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MWMzM2RiMzQtODYxZC00MWM3LWE3NzctMjU0MTc3MTc0MWUwLTE3ODUzMzI1MTkzMzY.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_MzRiYmYzMzEtOTg2Yi00ODgyLTkyMTktMjRiNjVkYWQ1ZDc5LTE3ODUzMzIxNDAwMTM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_MzRiYmYzMzEtOTg2Yi00ODgyLTkyMTktMjRiNjVkYWQ1ZDc5LTE3ODUzMzIxNDAwMTM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_NjA1NTEwZjUtZDE3NC00YzM0LWE1NTQtYzgyY2Q3MDIyMzkxLTE3ODUyNzI2ODQxMjQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_NjA1NTEwZjUtZDE3NC00YzM0LWE1NTQtYzgyY2Q3MDIyMzkxLTE3ODUyNzI2ODQxMjQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_NjNjMzgwYjMtMjk1MS00NjljLTg5NGEtOWE5MGJlZjU0ZjAxLTE3ODUyNzI1Nzg4MzU.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_NjNjMzgwYjMtMjk1MS00NjljLTg5NGEtOWE5MGJlZjU0ZjAxLTE3ODUyNzI1Nzg4MzU.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_OWJlN2VjODUtZTM2OC00ZjI1LWFiMjMtNmI1NThlY2E2MTZlLTE3ODUyNzI3MDQ0MDA.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_OWJlN2VjODUtZTM2OC00ZjI1LWFiMjMtNmI1NThlY2E2MTZlLTE3ODUyNzI3MDQ0MDA.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_YWFiOWVmNzQtNjhjNS00Zjg5LWI4YWMtMmNlMDgwM2U1MDJmLTE3ODUyNzA5MTY5OTc.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_YWFiOWVmNzQtNjhjNS00Zjg5LWI4YWMtMmNlMDgwM2U1MDJmLTE3ODUyNzA5MTY5OTc.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_ZDA1NzcyMWUtNDNjZS00Nzg2LWFlODItOWJmZDM3MjM2NDI2LTE3ODUyNzI3MTg3NjQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_ZDA1NzcyMWUtNDNjZS00Nzg2LWFlODItOWJmZDM3MjM2NDI2LTE3ODUyNzI3MTg3NjQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_ZGU0NWEyNjktZGVmNi00ODI4LTlmN2YtY2JhODQ2ZjlkNzY0LTE3ODUzMzUzMjY4MjI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_ZGU0NWEyNjktZGVmNi00ODI4LTlmN2YtY2JhODQ2ZjlkNzY0LTE3ODUzMzUzMjY4MjI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_ZjJjYjJhNDYtYjM0Ny00ODJhLWI0OTgtMWUzNWZhMjIzY2Q2LTE3ODUyNjc1MDM0MDI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_ZjJjYjJhNDYtYjM0Ny00ODJhLWI0OTgtMWUzNWZhMjIzY2Q2LTE3ODUyNjc1MDM0MDI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_ZjJmYjZhYzAtYzEyNS00NzhmLTk1NGUtNDFmOGQyMjdlNTg0LTE3ODUzMzI3Njk3MTY.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_ZjJmYjZhYzAtYzEyNS00NzhmLTk1NGUtNDFmOGQyMjdlNTg0LTE3ODUzMzI3Njk3MTY.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_leveling_ZmViYzk3YTgtOGIzNC00MGZiLWIyMDQtMGI4MWQwNzVjZjU4LTE3ODUyNzI3NjUzOTQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_leveling_ZmViYzk3YTgtOGIzNC00MGZiLWIyMDQtMGI4MWQwNzVjZjU4LTE3ODUyNzI3NjUzOTQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MDhlNjc5ZDktZGU0OS00YjU1LTllOTYtYjY5NTU3MjE0MzQ2LTE3ODUzNTE5NzQyNDM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MDhlNjc5ZDktZGU0OS00YjU1LTllOTYtYjY5NTU3MjE0MzQ2LTE3ODUzNTE5NzQyNDM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MGEwMTM5MDMtNjZkNi00ODgxLWE3YTItZTdlNTVkNjNkMTJiLTE3ODUyNjc1MTUzMDM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MGEwMTM5MDMtNjZkNi00ODgxLWE3YTItZTdlNTVkNjNkMTJiLTE3ODUyNjc1MTUzMDM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MjQyZGVjNWUtYjU0Yi00N2U1LTkzMzUtZTc1YjI5MTBjZDRkLTE3ODUyNzE4MTYyMDI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MjQyZGVjNWUtYjU0Yi00N2U1LTkzMzUtZTc1YjI5MTBjZDRkLTE3ODUyNzE4MTYyMDI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MjRkYTk4ZDYtNzgzMS00YWJiLTkyMWMtYzg5YmJiNDRmNzcwLTE3ODUyNzEwMzQ5MzQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MjRkYTk4ZDYtNzgzMS00YWJiLTkyMWMtYzg5YmJiNDRmNzcwLTE3ODUyNzEwMzQ5MzQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MWMzM2RiMzQtODYxZC00MWM3LWE3NzctMjU0MTc3MTc0MWUwLTE3ODUzMzI1MTkzMzY.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MWMzM2RiMzQtODYxZC00MWM3LWE3NzctMjU0MTc3MTc0MWUwLTE3ODUzMzI1MTkzMzY.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_MzRiYmYzMzEtOTg2Yi00ODgyLTkyMTktMjRiNjVkYWQ1ZDc5LTE3ODUzMzIxNDAwMTM.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_MzRiYmYzMzEtOTg2Yi00ODgyLTkyMTktMjRiNjVkYWQ1ZDc5LTE3ODUzMzIxNDAwMTM.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_NjA1NTEwZjUtZDE3NC00YzM0LWE1NTQtYzgyY2Q3MDIyMzkxLTE3ODUyNzI2ODQxMjQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_NjA1NTEwZjUtZDE3NC00YzM0LWE1NTQtYzgyY2Q3MDIyMzkxLTE3ODUyNzI2ODQxMjQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_NjNjMzgwYjMtMjk1MS00NjljLTg5NGEtOWE5MGJlZjU0ZjAxLTE3ODUyNzI1Nzg4MzU.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_NjNjMzgwYjMtMjk1MS00NjljLTg5NGEtOWE5MGJlZjU0ZjAxLTE3ODUyNzI1Nzg4MzU.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_OWJlN2VjODUtZTM2OC00ZjI1LWFiMjMtNmI1NThlY2E2MTZlLTE3ODUyNzI3MDQ0MDA.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_OWJlN2VjODUtZTM2OC00ZjI1LWFiMjMtNmI1NThlY2E2MTZlLTE3ODUyNzI3MDQ0MDA.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_YWFiOWVmNzQtNjhjNS00Zjg5LWI4YWMtMmNlMDgwM2U1MDJmLTE3ODUyNzA5MTY5OTc.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_YWFiOWVmNzQtNjhjNS00Zjg5LWI4YWMtMmNlMDgwM2U1MDJmLTE3ODUyNzA5MTY5OTc.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_ZDA1NzcyMWUtNDNjZS00Nzg2LWFlODItOWJmZDM3MjM2NDI2LTE3ODUyNzI3MTg3NjQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_ZDA1NzcyMWUtNDNjZS00Nzg2LWFlODItOWJmZDM3MjM2NDI2LTE3ODUyNzI3MTg3NjQ.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_ZGU0NWEyNjktZGVmNi00ODI4LTlmN2YtY2JhODQ2ZjlkNzY0LTE3ODUzMzUzMjY4MjI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_ZGU0NWEyNjktZGVmNi00ODI4LTlmN2YtY2JhODQ2ZjlkNzY0LTE3ODUzMzUzMjY4MjI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_ZjJjYjJhNDYtYjM0Ny00ODJhLWI0OTgtMWUzNWZhMjIzY2Q2LTE3ODUyNjc1MDM0MDI.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_ZjJjYjJhNDYtYjM0Ny00ODJhLWI0OTgtMWUzNWZhMjIzY2Q2LTE3ODUyNjc1MDM0MDI.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_ZjJmYjZhYzAtYzEyNS00NzhmLTk1NGUtNDFmOGQyMjdlNTg0LTE3ODUzMzI3Njk3MTY.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_ZjJmYjZhYzAtYzEyNS00NzhmLTk1NGUtNDFmOGQyMjdlNTg0LTE3ODUzMzI3Njk3MTY.json"
+    },
+    {
+      "path": "fancymenu_data/buddy/buddy_save_ZmViYzk3YTgtOGIzNC00MGZiLWIyMDQtMGI4MWQwNzVjZjU4LTE3ODUyNzI3NjUzOTQ.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/buddy/buddy_save_ZmViYzk3YTgtOGIzNC00MGZiLWIyMDQtMGI4MWQwNzVjZjU4LTE3ODUyNzI3NjUzOTQ.json"
+    },
+    {
+      "path": "fancymenu_data/last_world.fmdata",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/fancymenu_data/last_world.fmdata"
+    },
+    {
+      "path": "irisUpdateInfo.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/irisUpdateInfo.json"
+    },
+    {
+      "path": "kubejs/assets/kubejs/textures/block/example_block.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/assets/kubejs/textures/block/example_block.png"
+    },
+    {
+      "path": "kubejs/assets/kubejs/textures/item/example_item.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/assets/kubejs/textures/item/example_item.png"
+    },
+    {
+      "path": "kubejs/client_scripts/example.js",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/client_scripts/example.js"
+    },
+    {
+      "path": "kubejs/config/client.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/config/client.properties"
+    },
+    {
+      "path": "kubejs/config/common.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/config/common.properties"
+    },
+    {
+      "path": "kubejs/config/packicon.png",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/config/packicon.png"
+    },
+    {
+      "path": "kubejs/README.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/README.txt"
+    },
+    {
+      "path": "kubejs/startup_scripts/example.js",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/startup_scripts/example.js"
+    },
+    {
+      "path": "local/kubejs/dev.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/local/kubejs/dev.properties"
+    },
+    {
+      "path": "mods/alternate-current-mc1.20-1.9.0.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/alternate-current-mc1.20-1.9.0.jar"
+    },
+    {
+      "path": "mods/architectury-9.2.14-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/architectury-9.2.14-fabric.jar"
+    },
+    {
+      "path": "mods/BadOptimizations-2.4.1-1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/BadOptimizations-2.4.1-1.20.1.jar"
+    },
+    {
+      "path": "mods/betterbeds-1.3.0-1.19.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/betterbeds-1.3.0-1.19.3.jar"
+    },
+    {
+      "path": "mods/BetterF3-7.0.2-Fabric-1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/BetterF3-7.0.2-Fabric-1.20.1.jar"
+    },
+    {
+      "path": "mods/builtin-servers-2.1+1.20-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/builtin-servers-2.1+1.20-fabric.jar"
+    },
+    {
+      "path": "mods/c2me-fabric-mc1.20.1-0.2.0+alpha.11.18.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/c2me-fabric-mc1.20.1-0.2.0+alpha.11.18.jar"
+    },
+    {
+      "path": "mods/chatpatches-8.0-alpha.8%2B1.20.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/chatpatches-8.0-alpha.8%2B1.20.1-fabric.jar"
+    },
+    {
+      "path": "mods/citresewn-1.2.2+1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/citresewn-1.2.2+1.20.1.jar"
+    },
+    {
+      "path": "mods/Clear-Water-2.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Clear-Water-2.1.jar"
+    },
+    {
+      "path": "mods/cloth-config-11.1.136-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/cloth-config-11.1.136-fabric.jar"
+    },
+    {
+      "path": "mods/Clumps-fabric-1.20.1-12.0.0.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Clumps-fabric-1.20.1-12.0.0.4.jar"
+    },
+    {
+      "path": "mods/collective-1.20.1-8.39.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/collective-1.20.1-8.39.jar"
+    },
+    {
+      "path": "mods/commandkeys-fabric-2.4.0%2B1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/commandkeys-fabric-2.4.0%2B1.20.1.jar"
+    },
+    {
+      "path": "mods/continuity-3.0.0+1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/continuity-3.0.0+1.20.1.jar"
+    },
+    {
+      "path": "mods/Controlling-fabric-1.20.1-12.0.2.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Controlling-fabric-1.20.1-12.0.2.jar"
+    },
+    {
+      "path": "mods/CraftPresence-2.7.1+1.20.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/CraftPresence-2.7.1+1.20.1-fabric.jar"
+    },
+    {
+      "path": "mods/custom-crosshair-mod-v1.5.3-fabric-mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/custom-crosshair-mod-v1.5.3-fabric-mc1.20.1.jar"
+    },
+    {
+      "path": "mods/DarkKore-0.3.5-1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/DarkKore-0.3.5-1.20.1.jar"
+    },
+    {
+      "path": "mods/drippyloadingscreen_fabric_3.1.2_MC_1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/drippyloadingscreen_fabric_3.1.2_MC_1.20.1.jar"
+    },
+    {
+      "path": "mods/dynamic-fps-3.11.4+minecraft-1.20.0-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/dynamic-fps-3.11.4+minecraft-1.20.0-fabric.jar"
+    },
+    {
+      "path": "mods/enhancedblockentities-0.9+1.20.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/enhancedblockentities-0.9+1.20.jar"
+    },
+    {
+      "path": "mods/entityculling-fabric-1.7.1-mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/entityculling-fabric-1.7.1-mc1.20.1.jar"
+    },
+    {
+      "path": "mods/fabric-api-0.92.11%2B1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-api-0.92.11%2B1.20.1.jar"
+    },
+    {
+      "path": "mods/fabric-language-kotlin-1.13.13%2Bkotlin.2.4.10.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-language-kotlin-1.13.13%2Bkotlin.2.4.10.jar"
+    },
+    {
+      "path": "mods/fancymenu_fabric_3.9.8_MC_1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fancymenu_fabric_3.9.8_MC_1.20.1.jar"
+    },
+    {
+      "path": "mods/ferritecore-6.0.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/ferritecore-6.0.1-fabric.jar"
+    },
+    {
+      "path": "mods/FpsReducer2-fabric-1.20-2.5.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/FpsReducer2-fabric-1.20-2.5.jar"
+    },
+    {
+      "path": "mods/freecam-fabric-1.2.1+1.20.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/freecam-fabric-1.2.1+1.20.jar"
+    },
+    {
+      "path": "mods/freelook-1.1.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/freelook-1.1.3.jar"
+    },
+    {
+      "path": "mods/fullbrightnesstoggle-1.20.1-4.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fullbrightnesstoggle-1.20.1-4.4.jar"
+    },
+    {
+      "path": "mods/IAS-Fabric-1.20.1-9.0.0.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/IAS-Fabric-1.20.1-9.0.0.jar"
+    },
+    {
+      "path": "mods/ImmediatelyFast-Fabric-1.5.5%2B1.20.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/ImmediatelyFast-Fabric-1.5.5%2B1.20.4.jar"
+    },
+    {
+      "path": "mods/indium-1.0.36+mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/indium-1.0.36+mc1.20.1.jar"
+    },
+    {
+      "path": "mods/inventoryhud.fabric.1.20.1-3.4.26.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/inventoryhud.fabric.1.20.1-3.4.26.jar"
+    },
+    {
+      "path": "mods/iris-1.7.6+mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/iris-1.7.6+mc1.20.1.jar"
+    },
+    {
+      "path": "mods/konkrete_fabric_1.8.1_MC_1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/konkrete_fabric_1.8.1_MC_1.20.1.jar"
+    },
+    {
+      "path": "mods/KronHUD-1.20.1-2.2.6.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/KronHUD-1.20.1-2.2.6.jar"
+    },
+    {
+      "path": "mods/krypton-0.2.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/krypton-0.2.3.jar"
+    },
+    {
+      "path": "mods/kubejs-fabric-2001.6.5-build.26.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/kubejs-fabric-2001.6.5-build.26.jar"
+    },
+    {
+      "path": "mods/lazydfu-0.1.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/lazydfu-0.1.3.jar"
+    },
+    {
+      "path": "mods/lithium-fabric-mc1.20.1-0.11.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/lithium-fabric-mc1.20.1-0.11.4.jar"
+    },
+    {
+      "path": "mods/lunade-fastanim-1.6-1.20.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/lunade-fastanim-1.6-1.20.jar"
+    },
+    {
+      "path": "mods/melody_fabric_1.0.4_MC_1.20.1-1.20.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/melody_fabric_1.0.4_MC_1.20.1-1.20.4.jar"
+    },
+    {
+      "path": "mods/memoryleakfix-fabric-1.17+-1.1.5.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/memoryleakfix-fabric-1.17+-1.1.5.jar"
+    },
+    {
+      "path": "mods/modelfix-1.15-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/modelfix-1.15-fabric.jar"
+    },
+    {
+      "path": "mods/modernfix-fabric-5.25.2%2Bmc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/modernfix-fabric-5.25.2%2Bmc1.20.1.jar"
+    },
+    {
+      "path": "mods/modmenu-7.2.2.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/modmenu-7.2.2.jar"
+    },
+    {
+      "path": "mods/MoreCosmetics-Fabric-1.20.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/MoreCosmetics-Fabric-1.20.jar"
+    },
+    {
+      "path": "mods/noHurtCam+-2.3.1-1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/noHurtCam+-2.3.1-1.20.1.jar"
+    },
+    {
+      "path": "mods/offlinenametagicon-1.0.0.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/offlinenametagicon-1.0.0.jar"
+    },
+    {
+      "path": "mods/Paxi-1.20-Fabric-4.0.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Paxi-1.20-Fabric-4.0.jar"
+    },
+    {
+      "path": "mods/placeholder-api-2.1.4+1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/placeholder-api-2.1.4+1.20.1.jar"
+    },
+    {
+      "path": "mods/reeses_sodium_options-1.7.2+mc1.20.1-build.101.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/reeses_sodium_options-1.7.2+mc1.20.1-build.101.jar"
+    },
+    {
+      "path": "mods/resourcefulconfig-fabric-1.20.1-2.1.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/resourcefulconfig-fabric-1.20.1-2.1.3.jar"
+    },
+    {
+      "path": "mods/rhino-fabric-2001.2.3-build.10.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/rhino-fabric-2001.2.3-build.10.jar"
+    },
+    {
+      "path": "mods/screenshotgallery-fabric-1.8.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/screenshotgallery-fabric-1.8.jar"
+    },
+    {
+      "path": "mods/Searchables-fabric-1.20.1-1.0.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Searchables-fabric-1.20.1-1.0.3.jar"
+    },
+    {
+      "path": "mods/showownnmtg-1.0.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/showownnmtg-1.0.jar"
+    },
+    {
+      "path": "mods/Simple-Block-Overlay 1.20.x-fabric-1.4.3.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Simple-Block-Overlay 1.20.x-fabric-1.4.3.jar"
+    },
+    {
+      "path": "mods/SmoothScrollingRefurbished+1.20-1.1.2.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/SmoothScrollingRefurbished+1.20-1.1.2.jar"
+    },
+    {
+      "path": "mods/smoothswapping-0.9.3.2-1.20.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/smoothswapping-0.9.3.2-1.20.1-fabric.jar"
+    },
+    {
+      "path": "mods/sodium-extra-0.5.9+mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/sodium-extra-0.5.9+mc1.20.1.jar"
+    },
+    {
+      "path": "mods/sodium-fabric-0.5.13+mc1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/sodium-fabric-0.5.13+mc1.20.1.jar"
+    },
+    {
+      "path": "mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar"
+    },
+    {
+      "path": "mods/UniLib-1.2.1%2B1.20.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/UniLib-1.2.1%2B1.20.1-fabric.jar"
+    },
+    {
+      "path": "mods/viafabricplus-2.8.7.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/viafabricplus-2.8.7.jar"
+    },
+    {
+      "path": "mods/vmp-fabric-mc1.20.1-0.2.0+beta.7.102-all.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/vmp-fabric-mc1.20.1-0.2.0+beta.7.102-all.jar"
+    },
+    {
+      "path": "mods/watermedia-3.0.0.21.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/watermedia-3.0.0.21.jar"
+    },
+    {
+      "path": "mods/watermedia_binaries-3.0.0-rc.4.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/watermedia_binaries-3.0.0-rc.4.jar"
+    },
+    {
+      "path": "mods/yet_another_config_lib_v3-3.6.6+1.20.1-fabric.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/yet_another_config_lib_v3-3.6.6+1.20.1-fabric.jar"
+    },
+    {
+      "path": "mods/YungsApi-1.20-Fabric-4.0.6.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/YungsApi-1.20-Fabric-4.0.6.jar"
+    },
+    {
+      "path": "mods/zoomify-2.15.2%2B1.20.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/zoomify-2.15.2%2B1.20.1.jar"
+    },
+    {
+      "path": "MoreCosmetics/data/config/843835f0-5dfa-11ed-9a7e-f02f74958c02.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/config/843835f0-5dfa-11ed-9a7e-f02f74958c02.json"
+    },
+    {
+      "path": "MoreCosmetics/data/config/MoreCosmetics.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/config/MoreCosmetics.json"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/1.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/1.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/10.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/10.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/11.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/11.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/12.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/12.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/13.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/13.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/14.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/14.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/15.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/15.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/16.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/16.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/2.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/2.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/3.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/3.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/4.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/4.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/5.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/5.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/6.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/6.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/7.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/7.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/8.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/8.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/fonts/9.cmf",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/fonts/9.cmf"
+    },
+    {
+      "path": "MoreCosmetics/data/models/1.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/1.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/10.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/10.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/11.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/11.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/12.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/12.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/13.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/13.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/14.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/14.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/15.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/15.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/16.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/16.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/17.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/17.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/18.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/18.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/19.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/19.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/2.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/2.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/20.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/20.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/21.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/21.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/22.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/22.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/23.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/23.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/24.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/24.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/3.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/3.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/4.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/4.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/5.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/5.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/6.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/6.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/7.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/7.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/8.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/8.json"
+    },
+    {
+      "path": "MoreCosmetics/data/models/9.json",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/MoreCosmetics/data/models/9.json"
+    },
+    {
+      "path": "options.txt",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/options.txt"
+    },
+    {
+      "path": "resourcepacks/Mini Items.zip",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Mini Items.zip"
+    },
+    {
+      "path": "resourcepacks/Offline Nametag Icon Tempelate [SyanicXD].zip",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Offline Nametag Icon Tempelate [SyanicXD].zip"
+    },
+    {
+      "path": "rhino.local.properties",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/rhino.local.properties"
+    },
+    {
+      "path": "servers.dat",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/servers.dat"
+    },
+    {
+      "path": "servers.dat_old",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/servers.dat_old"
+    }
+  ]
 }
