@@ -1,5 +1,5 @@
 {
-  "version": 1785433174162,
+  "version": 1785443938444,
   "files": [
     {
       "path": "config/badoptimizations.txt",
@@ -634,6 +634,10 @@
       "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/custom-crosshair-mod-v1.5.3-fabric-mc1.20.1.jar"
     },
     {
+      "path": "mods/CustomSkinLoader_Universal-15.0.1.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/CustomSkinLoader_Universal-15.0.1.jar"
+    },
+    {
       "path": "mods/DarkKore-0.3.5-1.20.1.jar",
       "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/DarkKore-0.3.5-1.20.1.jar"
     },
@@ -816,10 +820,6 @@
     {
       "path": "mods/sodium-fabric-0.5.13+mc1.20.1.jar",
       "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/sodium-fabric-0.5.13+mc1.20.1.jar"
-    },
-    {
-      "path": "mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar"
     },
     {
       "path": "mods/UniLib-1.2.1%2B1.20.1-fabric.jar",
