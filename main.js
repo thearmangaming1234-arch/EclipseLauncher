@@ -14,6 +14,71 @@ const GAME_ROOT = path.join(__dirname, '.minecraft');
 
 let mainWindow = null;
 
+// Paths that MUST always be updated/overwritten (UI, scripts, branding, mods)
+const ALWAYS_SYNC_PATHS = [
+    'fancymenu_data',
+    'kubejs',
+    'local',
+    'mods',
+    'config/fancymenu',
+    'config/drippyloadingscreen',
+    'config/fabric',
+    'config/konkrete',
+    'config/paxi',
+    'config/builtinservers.json',
+    'config/craftpresence.json',
+    'config/watermedia.toml'
+];
+
+// Specific user preference files that should NEVER be overwritten once created
+const PROTECTED_USER_FILES = [
+    'options.txt',
+    'optionsof.txt',
+    'servers.dat',
+    'servers.dat_old',
+    'crosshair_config.ccmcfg'
+];
+
+/**
+ * Smart file filter to balance forced client updates with user config preservation
+ */
+function shouldSkipSync(relativePath, targetFullPath) {
+    // If destination file doesn't exist yet, NEVER skip (Fresh install initial copy!)
+    if (!fs.existsSync(targetFullPath)) {
+        return false; 
+    }
+
+    const normalized = relativePath.replace(/\\/g, '/');
+
+    // 1. Force updates for branded assets, scripts, mods & UI configurations
+    const isForcedSystemPath = ALWAYS_SYNC_PATHS.some(forcedPath => {
+        return normalized === forcedPath || 
+               normalized.startsWith(forcedPath + '/') || 
+               normalized.endsWith(forcedPath);
+    });
+    if (isForcedSystemPath) {
+        return false; // Force update/overwrite
+    }
+
+    // 2. Protect keybinds, option files, and custom crosshairs
+    const isProtectedFile = PROTECTED_USER_FILES.some(file => normalized.endsWith(file));
+    if (isProtectedFile) {
+        return true;
+    }
+
+    // 3. Protect user resourcepacks
+    if (normalized.startsWith('resourcepacks/')) {
+        return true;
+    }
+
+    // 4. Protect remaining config files by default (Sodium, Fullbright toggle, etc.)
+    if (normalized.startsWith('config/')) {
+        return true;
+    }
+
+    return false; // Sync everything else by default
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 900,
@@ -100,11 +165,14 @@ async function checkAndDownloadUpdates(event) {
         if (manifest.files && manifest.files.length > 0) {
             for (const item of manifest.files) {
                 const localFilePath = path.join(CLIENT_FILES_DIR, item.path);
-                if (!await fs.pathExists(localFilePath)) {
-                    event.reply('launch-progress', { type: 'status', task: `Downloading update: ${path.basename(item.path)}...` });
-                    await fs.ensureDir(path.dirname(localFilePath));
-                    await downloadFile(item.url, localFilePath);
+
+                if (shouldSkipSync(item.path, localFilePath)) {
+                    continue;
                 }
+
+                event.reply('launch-progress', { type: 'status', task: `Updating: ${path.basename(item.path)}...` });
+                await fs.ensureDir(path.dirname(localFilePath));
+                await downloadFile(item.url, localFilePath);
             }
         }
     } catch (err) {
@@ -115,7 +183,20 @@ async function checkAndDownloadUpdates(event) {
 async function syncClientFiles(targetDir) {
     try {
         if (await fs.pathExists(CLIENT_FILES_DIR)) {
-            await fs.copy(CLIENT_FILES_DIR, targetDir, { overwrite: true });
+            // Smart Copy: Protect local player options/keybinds from being overwritten by local client-files
+            await fs.copy(CLIENT_FILES_DIR, targetDir, {
+                overwrite: true,
+                filter: (src) => {
+                    const relativePath = path.relative(CLIENT_FILES_DIR, src);
+                    if (!relativePath) return true; // root folder
+
+                    const targetPath = path.join(targetDir, relativePath);
+                    if (shouldSkipSync(relativePath, targetPath)) {
+                        return false; // Skip copying to preserve user's game settings
+                    }
+                    return true;
+                }
+            });
         } else {
             await fs.ensureDir(CLIENT_FILES_DIR);
         }
