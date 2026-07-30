@@ -31,7 +31,8 @@
   "dependencies": {
     "electron-updater": "^6.3.9",
     "fs-extra": "^11.2.0",
-    "minecraft-launcher-core": "^3.12.0"
+    "minecraft-launcher-core": "^3.12.0",
+    "msmc": "^5.0.5"
   },
   "devDependencies": {
     "electron": "^28.3.3"
