@@ -44,7 +44,6 @@ const PROTECTED_USER_FILES = [
  * Smart file filter to balance forced client updates with user config preservation
  */
 function shouldSkipSync(relativePath, targetFullPath) {
-    // If destination file doesn't exist yet, NEVER skip (Fresh install initial copy!)
     if (!fs.existsSync(targetFullPath)) {
         return false; 
     }
@@ -58,7 +57,7 @@ function shouldSkipSync(relativePath, targetFullPath) {
                normalized.endsWith(forcedPath);
     });
     if (isForcedSystemPath) {
-        return false; // Force update/overwrite
+        return false; 
     }
 
     // 2. Protect keybinds, option files, and custom crosshairs
@@ -72,12 +71,12 @@ function shouldSkipSync(relativePath, targetFullPath) {
         return true;
     }
 
-    // 4. Protect remaining config files by default (Sodium, Fullbright toggle, etc.)
+    // 4. Protect remaining config files by default
     if (normalized.startsWith('config/')) {
         return true;
     }
 
-    return false; // Sync everything else by default
+    return false;
 }
 
 function createWindow() {
@@ -132,7 +131,7 @@ ipcMain.on('ms-login-start', async (event) => {
 
 function fetchManifest() {
     return new Promise((resolve, reject) => {
-        https.get(MANIFEST_URL, (res) => {
+        const req = https.get(MANIFEST_URL, (res) => {
             let data = '';
             res.on('data', (chunk) => data += chunk);
             res.on('end', () => {
@@ -142,7 +141,12 @@ function fetchManifest() {
                     reject(e);
                 }
             });
-        }).on('error', reject);
+        });
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+            req.destroy();
+            reject(new Error("Manifest fetch timed out"));
+        });
     });
 }
 
@@ -153,8 +157,7 @@ function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const protocol = url.startsWith('https') ? https : http;
         
-        protocol.get(url, (response) => {
-            // Follow redirects (HTTP 301, 302, 303, 307, 308)
+        const req = protocol.get(url, (response) => {
             if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
                 return downloadFile(response.headers.location, dest).then(resolve).catch(reject);
             }
@@ -173,8 +176,15 @@ function downloadFile(url, dest) {
             file.on('error', (err) => {
                 fs.unlink(dest, () => reject(err));
             });
-        }).on('error', (err) => {
+        });
+
+        req.on('error', (err) => {
             fs.unlink(dest, () => reject(err));
+        });
+        
+        req.setTimeout(15000, () => {
+            req.destroy();
+            fs.unlink(dest, () => reject(new Error("Download timed out")));
         });
     });
 }
@@ -198,23 +208,22 @@ async function checkAndDownloadUpdates(event) {
             }
         }
     } catch (err) {
-        console.warn("Could not check online updates. Continuing local...", err);
+        console.warn("Could not check online updates. Continuing local...", err.message);
     }
 }
 
 async function syncClientFiles(targetDir) {
     try {
         if (await fs.pathExists(CLIENT_FILES_DIR)) {
-            // Smart Copy: Protect local player options/keybinds from being overwritten by local client-files
             await fs.copy(CLIENT_FILES_DIR, targetDir, {
                 overwrite: true,
                 filter: (src) => {
                     const relativePath = path.relative(CLIENT_FILES_DIR, src);
-                    if (!relativePath) return true; // root folder
+                    if (!relativePath) return true;
 
                     const targetPath = path.join(targetDir, relativePath);
                     if (shouldSkipSync(relativePath, targetPath)) {
-                        return false; // Skip copying to preserve user's game settings
+                        return false;
                     }
                     return true;
                 }
@@ -255,8 +264,11 @@ ipcMain.on('launch-game', async (event, data) => {
     event.reply('launch-progress', { type: 'status', task: "Verifying client files..." });
     await syncClientFiles(GAME_ROOT);
 
+    // Validate if explicit Java installation exists; fallback to auto-detection if missing
+    const preferredJavaPath = "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.8-hotspot\\bin\\java.exe";
+    const customJava = fs.existsSync(preferredJavaPath) ? preferredJavaPath : undefined;
+
     let opts = {
-        javaPath: "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.8-hotspot\\bin\\java.exe",
         authorization: authHeader,
         root: GAME_ROOT,
         version: {
@@ -271,10 +283,20 @@ ipcMain.on('launch-game', async (event, data) => {
         window: {
             width: parseInt(data.width) || 854,
             height: parseInt(data.height) || 480,
-            fullscreen: data.fullscreen || false
+            fullscreen: false // Let FancyMenu handle fullscreen inside game render
         },
         customArgs: customArgs
     };
+
+    if (customJava) {
+        opts.javaPath = customJava;
+    }
+
+    // Clean up event listeners before launching to prevent duplicates
+    launcher.removeAllListeners('debug');
+    launcher.removeAllListeners('data');
+    launcher.removeAllListeners('progress');
+    launcher.removeAllListeners('close');
 
     launcher.launch(opts);
 
