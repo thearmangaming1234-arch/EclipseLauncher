@@ -6,6 +6,9 @@ const http = require('http');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require('msmc');
 
+// Prevent Electron from hogging GPU/RAM resources off integrated graphics
+app.disableHardwareAcceleration();
+
 const launcher = new Client();
 const msmcAuth = new Auth("select_account");
 
@@ -15,12 +18,12 @@ const GAME_ROOT = path.join(__dirname, '.minecraft');
 
 let mainWindow = null;
 
-// Paths that MUST always be updated/overwritten (UI, scripts, branding, mods)
 const ALWAYS_SYNC_PATHS = [
     'fancymenu_data',
     'kubejs',
     'local',
     'mods',
+    'versions',
     'config/fancymenu',
     'config/drippyloadingscreen',
     'config/fabric',
@@ -31,7 +34,6 @@ const ALWAYS_SYNC_PATHS = [
     'config/watermedia.toml'
 ];
 
-// Specific user preference files that should NEVER be overwritten once created
 const PROTECTED_USER_FILES = [
     'options.txt',
     'optionsof.txt',
@@ -40,9 +42,6 @@ const PROTECTED_USER_FILES = [
     'crosshair_config.ccmcfg'
 ];
 
-/**
- * Smart file filter to balance forced client updates with user config preservation
- */
 function shouldSkipSync(relativePath, targetFullPath) {
     if (!fs.existsSync(targetFullPath)) {
         return false; 
@@ -50,7 +49,6 @@ function shouldSkipSync(relativePath, targetFullPath) {
 
     const normalized = relativePath.replace(/\\/g, '/');
 
-    // 1. Force updates for branded assets, scripts, mods & UI configurations
     const isForcedSystemPath = ALWAYS_SYNC_PATHS.some(forcedPath => {
         return normalized === forcedPath || 
                normalized.startsWith(forcedPath + '/') || 
@@ -60,18 +58,15 @@ function shouldSkipSync(relativePath, targetFullPath) {
         return false; 
     }
 
-    // 2. Protect keybinds, option files, and custom crosshairs
     const isProtectedFile = PROTECTED_USER_FILES.some(file => normalized.endsWith(file));
     if (isProtectedFile) {
         return true;
     }
 
-    // 3. Protect user resourcepacks
     if (normalized.startsWith('resourcepacks/')) {
         return true;
     }
 
-    // 4. Protect remaining config files by default
     if (normalized.startsWith('config/')) {
         return true;
     }
@@ -79,9 +74,6 @@ function shouldSkipSync(relativePath, targetFullPath) {
     return false;
 }
 
-/**
- * Helper function to check if Minecraft/Fabric installation exists
- */
 function isGameInstalled() {
     const versionDir = path.join(GAME_ROOT, 'versions');
     if (fs.existsSync(GAME_ROOT) && fs.existsSync(versionDir)) {
@@ -120,7 +112,6 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-// Window Control Handlers
 ipcMain.on('window-min', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
@@ -130,7 +121,6 @@ ipcMain.on('check-install-status', (event) => {
     event.reply('install-status', isGameInstalled());
 });
 
-/* Microsoft Login Flow */
 ipcMain.on('ms-login-start', async (event) => {
     try {
         const xboxManager = await msmcAuth.launch("electron");
@@ -172,9 +162,6 @@ function fetchManifest() {
     });
 }
 
-/**
- * Robust downloader that follows HTTP/HTTPS redirects for raw GitHub files
- */
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
         const protocol = url.startsWith('https') ? https : http;
@@ -222,9 +209,9 @@ async function checkAndDownloadUpdates(event) {
 
             for (const item of manifest.files) {
                 count++;
-                const localFilePath = path.join(CLIENT_FILES_DIR, item.path);
+                const targetFilePath = path.join(GAME_ROOT, item.path);
 
-                if (shouldSkipSync(item.path, localFilePath)) {
+                if (shouldSkipSync(item.path, targetFilePath)) {
                     continue;
                 }
 
@@ -236,10 +223,9 @@ async function checkAndDownloadUpdates(event) {
                 });
 
                 try {
-                    await fs.ensureDir(path.dirname(localFilePath));
-                    await downloadFile(item.url, localFilePath);
+                    await fs.ensureDir(path.dirname(targetFilePath));
+                    await downloadFile(item.url, targetFilePath);
                 } catch (fileErr) {
-                    // Gracefully skip missing GitHub files instead of crashing!
                     console.warn(`[SKIP] Could not fetch ${item.path}: ${fileErr.message}`);
                 }
             }
@@ -254,6 +240,7 @@ async function syncClientFiles(targetDir) {
         if (await fs.pathExists(CLIENT_FILES_DIR)) {
             await fs.copy(CLIENT_FILES_DIR, targetDir, {
                 overwrite: true,
+                errorOnExist: false,
                 filter: (src) => {
                     const relativePath = path.relative(CLIENT_FILES_DIR, src);
                     if (!relativePath) return true;
@@ -265,18 +252,16 @@ async function syncClientFiles(targetDir) {
                     return true;
                 }
             });
-        } else {
-            await fs.ensureDir(CLIENT_FILES_DIR);
         }
     } catch (err) {
-        console.error("Error syncing client files:", err);
+        console.warn("Warning during client sync (file may be locked by running game):", err.message);
     }
 }
 
-/* Explicit Download Handler if game files do not exist */
 ipcMain.on('download-client', async (event) => {
     try {
         await fs.ensureDir(GAME_ROOT);
+
         await checkAndDownloadUpdates(event);
         
         event.reply('launch-progress', { type: 'status', task: "Syncing game structure..." });
@@ -284,16 +269,17 @@ ipcMain.on('download-client', async (event) => {
 
         event.reply('download-complete');
         event.reply('install-status', isGameInstalled());
+
     } catch (err) {
         console.error("Download client error:", err);
         event.reply('launch-progress', { type: 'status', task: "Download failed! Please retry." });
     }
 });
 
-/* Game Launch Execution */
 ipcMain.on('launch-game', async (event, data) => {
     const authType = data.authType || 'cracked';
-    const ramInMb = data.ram || "4096";
+    // Default RAM set to 3478MB for 8GB RAM laptops
+    const ramInMb = data.ram || "3478";
     const behavior = data.behavior || "hide";
 
     let authHeader;
@@ -312,7 +298,18 @@ ipcMain.on('launch-game', async (event, data) => {
         authHeader = Authenticator.getAuth(data.username);
     }
 
-    const customArgs = data.jvmFlags ? data.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
+    const userJvmFlags = data.jvmFlags ? data.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
+    
+    // Performance garbage collection flags + Fabric logging
+    const defaultJvmFlags = [
+        "-Dfabric.log.level=info",
+        "-XX:+UseG1GC",
+        "-XX:+ParallelRefProcEnabled",
+        "-XX:MaxGCPauseMillis=200",
+        "-XX:+UnlockExperimentalVMOptions",
+        "-XX:+DisableExplicitGC"
+    ];
+    const customArgs = [...defaultJvmFlags, ...userJvmFlags];
 
     await checkAndDownloadUpdates(event);
 
