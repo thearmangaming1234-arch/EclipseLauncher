@@ -1,5 +1,5 @@
 {
-  "version": 1785490896721,
+  "version": 1785495026199,
   "files": [
     {
       "path": "config/badoptimizations.txt",
@@ -552,6 +552,10 @@
     {
       "path": "kubejs/README.txt",
       "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/README.txt"
+    },
+    {
+      "path": "kubejs/startup_scripts/example.js",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/kubejs/startup_scripts/example.js"
     },
     {
       "path": "local/kubejs/dev.properties",
