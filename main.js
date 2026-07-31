@@ -79,6 +79,22 @@ function shouldSkipSync(relativePath, targetFullPath) {
     return false;
 }
 
+/**
+ * Helper function to check if Minecraft/Fabric installation exists
+ */
+function isGameInstalled() {
+    const versionDir = path.join(GAME_ROOT, 'versions');
+    if (fs.existsSync(GAME_ROOT) && fs.existsSync(versionDir)) {
+        try {
+            const files = fs.readdirSync(versionDir);
+            return files.length > 0;
+        } catch (e) {
+            return false;
+        }
+    }
+    return false;
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 900,
@@ -96,16 +112,22 @@ function createWindow() {
     });
 
     mainWindow.loadFile('index.html');
+
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.send('install-status', isGameInstalled());
+    });
 }
 
 app.whenReady().then(createWindow);
 
-ipcMain.on('window-min', () => {
-    if (mainWindow) mainWindow.minimize();
-});
+// Window Control Handlers
+ipcMain.on('window-min', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
+ipcMain.on('window-close', () => { if (mainWindow) mainWindow.close(); });
+ipcMain.on('get-game-path', (event) => { event.reply('game-path', GAME_ROOT); });
 
-ipcMain.on('get-game-path', (event) => {
-    event.reply('game-path', GAME_ROOT);
+ipcMain.on('check-install-status', (event) => {
+    event.reply('install-status', isGameInstalled());
 });
 
 /* Microsoft Login Flow */
@@ -118,7 +140,7 @@ ipcMain.on('ms-login-start', async (event) => {
             const profile = token.mclc();
             event.reply('ms-login-success', {
                 name: profile.name,
-                token: token
+                token: JSON.stringify(token)
             });
         } else {
             event.reply('ms-login-error', "Invalid credentials");
@@ -163,7 +185,7 @@ function downloadFile(url, dest) {
             }
 
             if (response.statusCode !== 200) {
-                return reject(new Error(`Failed to download ${url}: HTTP ${response.statusCode}`));
+                return reject(new Error(`HTTP ${response.statusCode}`));
             }
 
             const file = fs.createWriteStream(dest);
@@ -195,16 +217,31 @@ async function checkAndDownloadUpdates(event) {
         const manifest = await fetchManifest();
 
         if (manifest.files && manifest.files.length > 0) {
+            let count = 0;
+            const total = manifest.files.length;
+
             for (const item of manifest.files) {
+                count++;
                 const localFilePath = path.join(CLIENT_FILES_DIR, item.path);
 
                 if (shouldSkipSync(item.path, localFilePath)) {
                     continue;
                 }
 
-                event.reply('launch-progress', { type: 'status', task: `Updating: ${path.basename(item.path)}...` });
-                await fs.ensureDir(path.dirname(localFilePath));
-                await downloadFile(item.url, localFilePath);
+                const percentage = Math.round((count / total) * 100);
+                event.reply('launch-progress', { 
+                    type: 'progress', 
+                    percentage: percentage,
+                    task: `Downloading asset (${count}/${total}): ${path.basename(item.path)}...` 
+                });
+
+                try {
+                    await fs.ensureDir(path.dirname(localFilePath));
+                    await downloadFile(item.url, localFilePath);
+                } catch (fileErr) {
+                    // Gracefully skip missing GitHub files instead of crashing!
+                    console.warn(`[SKIP] Could not fetch ${item.path}: ${fileErr.message}`);
+                }
             }
         }
     } catch (err) {
@@ -236,6 +273,24 @@ async function syncClientFiles(targetDir) {
     }
 }
 
+/* Explicit Download Handler if game files do not exist */
+ipcMain.on('download-client', async (event) => {
+    try {
+        await fs.ensureDir(GAME_ROOT);
+        await checkAndDownloadUpdates(event);
+        
+        event.reply('launch-progress', { type: 'status', task: "Syncing game structure..." });
+        await syncClientFiles(GAME_ROOT);
+
+        event.reply('download-complete');
+        event.reply('install-status', isGameInstalled());
+    } catch (err) {
+        console.error("Download client error:", err);
+        event.reply('launch-progress', { type: 'status', task: "Download failed! Please retry." });
+    }
+});
+
+/* Game Launch Execution */
 ipcMain.on('launch-game', async (event, data) => {
     const authType = data.authType || 'cracked';
     const ramInMb = data.ram || "4096";
@@ -264,7 +319,6 @@ ipcMain.on('launch-game', async (event, data) => {
     event.reply('launch-progress', { type: 'status', task: "Verifying client files..." });
     await syncClientFiles(GAME_ROOT);
 
-    // Validate if explicit Java installation exists; fallback to auto-detection if missing
     const preferredJavaPath = "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.8-hotspot\\bin\\java.exe";
     const customJava = fs.existsSync(preferredJavaPath) ? preferredJavaPath : undefined;
 
@@ -283,7 +337,7 @@ ipcMain.on('launch-game', async (event, data) => {
         window: {
             width: parseInt(data.width) || 854,
             height: parseInt(data.height) || 480,
-            fullscreen: false // Let FancyMenu handle fullscreen inside game render
+            fullscreen: false
         },
         customArgs: customArgs
     };
@@ -292,7 +346,6 @@ ipcMain.on('launch-game', async (event, data) => {
         opts.javaPath = customJava;
     }
 
-    // Clean up event listeners before launching to prevent duplicates
     launcher.removeAllListeners('debug');
     launcher.removeAllListeners('data');
     launcher.removeAllListeners('progress');
@@ -332,6 +385,7 @@ ipcMain.on('launch-game', async (event, data) => {
         if (behavior === 'hide' && mainWindow) {
             mainWindow.show();
         }
+        event.reply('install-status', isGameInstalled());
         event.reply('game-closed');
     });
 });

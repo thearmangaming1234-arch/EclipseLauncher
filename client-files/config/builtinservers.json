@@ -1,0 +1,10 @@
+{
+  "badgeVisible": true,
+  "builtinServers": [
+    {
+      "name": "EclipseMC",
+      "address": "EclipseMC-FUN.aternos.me",
+      "forced": true
+    }
+  ]
+}

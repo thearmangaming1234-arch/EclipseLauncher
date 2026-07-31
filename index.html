@@ -21,7 +21,6 @@
             padding: 0;
         }
 
-        /* Root Container */
         .app-container {
             width: 100%;
             height: 100%;
@@ -33,7 +32,6 @@
             background: transparent;
         }
 
-        /* Solid Pitch Black Sidebar */
         .sidebar {
             width: 75px;
             background-color: #000000;
@@ -83,7 +81,6 @@
             box-shadow: 0 4px 16px rgba(255, 183, 3, 0.35);
         }
 
-        /* Right Content Area */
         .main-content {
             flex: 1;
             display: flex;
@@ -91,7 +88,6 @@
             background: transparent;
         }
 
-        /* Solid Pitch Black Top Bar */
         .top-bar {
             height: 65px;
             display: flex;
@@ -200,7 +196,6 @@
             color: #fff;
         }
 
-        /* Glassmorphism Main Dashboard Area */
         .dashboard {
             padding: 25px 30px;
             flex: 1;
@@ -214,12 +209,6 @@
             overflow-y: auto;
         }
 
-        /* Custom Scrollbar */
-        .dashboard::-webkit-scrollbar { width: 8px; }
-        .dashboard::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); border-radius: 8px; margin: 10px 0; }
-        .dashboard::-webkit-scrollbar-thumb { background: rgba(255, 183, 3, 0.3); border-radius: 8px; border: 1px solid rgba(255, 183, 3, 0.1); }
-        .dashboard::-webkit-scrollbar-thumb:hover { background: rgba(255, 183, 3, 0.7); }
-
         .tab-content { display: none; width: 100%; }
         .tab-content.active-tab { display: flex; flex-direction: column; }
 
@@ -232,9 +221,12 @@
             padding: 24px;
             width: 100%;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        .version-pills { display: flex; gap: 8px; margin-bottom: 20px; }
+        .version-pills { display: flex; gap: 8px; margin-bottom: 20px; align-self: flex-start; }
 
         .pill {
             background: rgba(255, 255, 255, 0.05);
@@ -242,16 +234,8 @@
             border-radius: 20px;
             font-size: 13px;
             font-weight: 600;
-            color: #777777;
-            cursor: pointer;
-            border: 1px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .pill.active {
-            background: rgba(255, 183, 3, 0.1);
             color: #ffb703;
-            border-color: #ffb703;
+            border: 1px solid #ffb703;
         }
 
         .play-btn-wrapper {
@@ -269,6 +253,12 @@
             box-shadow: 0 8px 26px rgba(255, 183, 3, 0.45);
         }
 
+        .play-btn-wrapper.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            transform: none;
+        }
+
         .play-btn {
             width: 100%;
             background: transparent;
@@ -282,14 +272,17 @@
             text-align: center;
         }
 
+        /* Sub-text for live progress/verification updates */
         .status-text {
-            margin-top: 14px;
+            margin-top: 12px;
             font-size: 13px;
-            color: #888888;
+            color: #a0a0a0;
             text-align: center;
+            font-weight: 500;
+            min-height: 18px;
         }
 
-        /* Settings Card */
+        /* Settings CSS */
         .settings-card {
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -299,8 +292,6 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            margin-bottom: 10px;
         }
 
         .settings-header {
@@ -339,7 +330,6 @@
             border-radius: 4px;
             background: #1a1a1a;
             outline: none;
-            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .ram-slider::-webkit-slider-thumb {
@@ -350,7 +340,6 @@
             border-radius: 50%;
             background: linear-gradient(135deg, #ffb703 0%, #fb8500 100%);
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(255, 183, 3, 0.5);
         }
 
         .text-input, .select-input {
@@ -364,11 +353,7 @@
             outline: none;
         }
 
-        .select-input option { background: #0d0d0d; color: #fff; }
-        .text-input:focus, .select-input:focus { border-color: #ffb703; }
-
         .res-row { display: flex; gap: 12px; align-items: center; }
-
         .res-input-container { display: flex; align-items: center; gap: 6px; flex: 1; }
         .res-input-container input { width: 80px; text-align: center; }
 
@@ -391,29 +376,17 @@
         input:checked + .slider-round:before { transform: translateX(18px); background-color: #ffb703; }
 
         .folder-row { display: flex; gap: 10px; }
-
         .folder-btn {
             background: #1a1a1a; color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.3);
-            padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-            cursor: pointer; white-space: nowrap; transition: background 0.2s;
+            padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;
         }
-
-        .folder-btn:hover { background: rgba(255, 183, 3, 0.15); }
 
         .settings-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
-
-        .settings-btn {
-            padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 700;
-            cursor: pointer; border: none; transition: all 0.2s;
-        }
-
+        .settings-btn { padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; }
         .save-btn { background: linear-gradient(135deg, #ffb703 0%, #fb8500 100%); color: #000000; }
-        .save-btn:hover { box-shadow: 0 4px 14px rgba(255, 183, 3, 0.35); transform: translateY(-1px); }
-
         .reset-btn { background: #1a1a1a; color: #888888; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .reset-btn:hover { background: #252525; color: #ffffff; }
 
-        /* MULTI-TAB ACCOUNT MODAL */
+        /* Modal */
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); align-items: center; justify-content: center; z-index: 100;
@@ -422,19 +395,11 @@
         .modal-content {
             background: #000000; padding: 25px; border-radius: 16px;
             border: 1px solid #ffb703; display: flex; flex-direction: column;
-            gap: 16px; width: 340px; box-shadow: 0 0 30px rgba(255, 183, 3, 0.2);
+            gap: 16px; width: 340px;
         }
 
-        .auth-type-tabs {
-            display: flex; gap: 6px; background: #0a0a0a; padding: 4px; border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .auth-tab-btn {
-            flex: 1; padding: 8px; border: none; border-radius: 6px; background: transparent;
-            color: #777777; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-        }
-
+        .auth-type-tabs { display: flex; gap: 6px; background: #0a0a0a; padding: 4px; border-radius: 10px; }
+        .auth-tab-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; background: transparent; color: #777; font-size: 12px; font-weight: 700; cursor: pointer; }
         .auth-tab-btn.active { background: #1a1a1a; color: #ffb703; }
 
         .auth-panel { display: none; flex-direction: column; gap: 12px; }
@@ -442,32 +407,14 @@
 
         .ms-login-btn {
             background: #00a4ef; color: #ffffff; font-weight: bold; padding: 12px;
-            border: none; border-radius: 8px; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; gap: 10px; font-size: 13px;
-            transition: background 0.2s;
+            border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
         }
 
-        .ms-login-btn:hover { background: #0078d4; }
-
-        .modal-content input {
-            padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.15);
-            background: #0d0d0d; color: #fff; outline: none;
-        }
-
-        .modal-content input:focus { border-color: #ffb703; }
-        .modal-error { color: #ff4d4d; font-size: 12px; display: none; line-height: 1.3; }
-
+        .modal-content input { padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.15); background: #0d0d0d; color: #fff; }
+        .modal-error { color: #ff4d4d; font-size: 12px; display: none; }
         .modal-buttons { display: flex; gap: 10px; }
-
-        .modal-content button.action-btn {
-            flex: 1; background: #ffb703; color: #000000; font-weight: bold;
-            padding: 12px; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;
-        }
-
-        .modal-content button.action-btn:hover { background: #fb8500; }
-
-        .modal-content button.cancel-btn { flex: 1; background: #222222; color: #aaaaaa; border: none; border-radius: 8px; cursor: pointer; }
-        .modal-content button.cancel-btn:hover { background: #333333; color: #ffffff; }
+        .modal-content button.action-btn { flex: 1; background: #ffb703; color: #000; font-weight: bold; padding: 12px; border: none; border-radius: 8px; cursor: pointer; }
+        .modal-content button.cancel-btn { flex: 1; background: #222; color: #aaa; border: none; border-radius: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -484,7 +431,7 @@
             </div>
         </div>
 
-        <!-- Main Content -->
+        <!-- Main Content Area -->
         <div class="main-content">
             <div class="top-bar">
                 <div class="title-text">ECLIPSE</div>
@@ -514,14 +461,15 @@
                     <div class="launch-section">
                         <div class="version-card">
                             <div class="version-pills">
-                                <div class="pill active">1.20.1</div>
+                                <div class="pill">1.20.1</div>
                             </div>
 
                             <div class="play-btn-wrapper" id="playBtnWrapper">
                                 <button class="play-btn" id="playBtn">LAUNCH</button>
                             </div>
 
-                            <div class="status-text" id="statusMsg">Ready to launch</div>
+                            <!-- Live status updates show here (Downloading 45%, Verifying 80%, etc.) -->
+                            <div class="status-text" id="statusText"></div>
                         </div>
                     </div>
                 </div>
@@ -598,16 +546,14 @@
                 <button class="auth-tab-btn" id="tabCrackedBtn">Cracked</button>
             </div>
 
-            <!-- Microsoft Auth Panel -->
             <div class="auth-panel active" id="msPanel">
                 <p style="font-size: 12px; color: #aaa; text-align: center;">Log in with official Minecraft account to play on Hypixel & Premium servers.</p>
                 <button class="ms-login-btn" id="msLoginBtn">
-                    <svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H1z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H1z"/></svg>
                     Login via Microsoft
                 </button>
             </div>
 
-            <!-- Cracked Auth Panel -->
             <div class="auth-panel" id="crackedPanel">
                 <input type="text" id="usernameInput" placeholder="Offline Username..." maxlength="16" />
                 <button class="action-btn" id="saveCrackedBtn">Save Offline Account</button>
@@ -633,7 +579,11 @@
             jvmFlags: ""
         };
 
-        /* Navigation */
+        let isInstalled = false;
+
+        document.getElementById('minBtn').addEventListener('click', () => ipcRenderer.send('window-min'));
+        document.getElementById('closeBtn').addEventListener('click', () => ipcRenderer.send('window-close'));
+
         const navPlayBtn = document.getElementById('navPlayBtn');
         const navSettingsBtn = document.getElementById('navSettingsBtn');
         const playTab = document.getElementById('playTab');
@@ -653,7 +603,6 @@
             playTab.classList.remove('active-tab');
         });
 
-        /* Settings Bindings */
         const ramSlider = document.getElementById('ramSlider');
         const ramValue = document.getElementById('ramValue');
         const launcherBehavior = document.getElementById('launcherBehavior');
@@ -705,7 +654,6 @@
             jvmFlags.value = DEFAULTS.jvmFlags;
         });
 
-        /* ACCOUNT MANAGEMENT SYSTEM */
         let currentAuthType = localStorage.getItem('eclipse_auth_type') || 'cracked'; 
         let savedUser = localStorage.getItem('eclipse_username') || null;
 
@@ -725,7 +673,6 @@
             }
         }
 
-        /* Modal Logic */
         const modal = document.getElementById('accountModal');
         const modalError = document.getElementById('modalError');
         const tabMsBtn = document.getElementById('tabMsBtn');
@@ -762,7 +709,6 @@
             modal.style.display = 'none';
         });
 
-        /* Save Cracked Account */
         document.getElementById('saveCrackedBtn').addEventListener('click', () => {
             const val = usernameInput.value.trim();
             if (!validateMinecraftUsername(val)) {
@@ -773,16 +719,13 @@
 
             localStorage.setItem('eclipse_auth_type', 'cracked');
             localStorage.setItem('eclipse_username', val);
-            localStorage.removeItem('eclipse_ms_token'); // Clear MS Token
+            localStorage.removeItem('eclipse_ms_token');
 
             currentAuthType = 'cracked';
             updateAccountUI(val);
             modal.style.display = 'none';
-            statusMsg.innerText = "Ready to launch";
-            statusMsg.style.color = "#888888";
         });
 
-        /* Trigger Microsoft Login Flow */
         document.getElementById('msLoginBtn').addEventListener('click', () => {
             modalError.innerText = "Opening browser... please log in!";
             modalError.style.color = "#ffb703";
@@ -798,77 +741,104 @@
             currentAuthType = 'microsoft';
             updateAccountUI(accountData.name);
             modal.style.display = 'none';
-            statusMsg.innerText = `Logged in as ${accountData.name}`;
-            statusMsg.style.color = "#ffb703";
         });
 
-        ipcRenderer.on('ms-login-error', (event, err) => {
+        ipcRenderer.on('ms-login-error', () => {
             modalError.innerText = "Login failed or cancelled!";
             modalError.style.color = "#ff4d4d";
             modalError.style.display = 'block';
         });
 
         document.getElementById('discordBtn').addEventListener('click', () => {
-            shell.openExternal('https://discord.gg/DUeAgbph79');
+            shell.openExternal('https://discord.gg');
         });
 
-        /* Launch Controls */
+        /* DYNAMIC INSTALLATION & STATUS SYSTEM */
         const playBtn = document.getElementById('playBtn');
         const playBtnWrapper = document.getElementById('playBtnWrapper');
-        const statusMsg = document.getElementById('statusMsg');
+        const statusText = document.getElementById('statusText');
+
+        ipcRenderer.send('check-install-status');
+
+        ipcRenderer.on('install-status', (event, installed) => {
+            isInstalled = installed;
+            playBtnWrapper.classList.remove('disabled');
+
+            if (installed) {
+                playBtn.innerText = "LAUNCH";
+                statusText.innerText = ""; // Empty while ready
+            } else {
+                playBtn.innerText = "DOWNLOAD";
+                statusText.innerText = "";
+            }
+        });
 
         playBtn.addEventListener('click', () => {
-            const authType = localStorage.getItem('eclipse_auth_type') || 'cracked';
             const username = localStorage.getItem('eclipse_username');
+            const authType = localStorage.getItem('eclipse_auth_type') || 'cracked';
 
             if (!username) {
-                statusMsg.innerText = "Please log in before launching!";
-                statusMsg.style.color = "#ff4d4d";
-                document.getElementById('accountBtn').click();
+                modal.style.display = 'flex';
                 return;
             }
 
-            const launchConfig = {
-                authType: authType,
-                username: username,
-                msToken: localStorage.getItem('eclipse_ms_token'),
-                ram: localStorage.getItem('eclipse_ram') || DEFAULTS.ram,
-                behavior: localStorage.getItem('eclipse_behavior') || DEFAULTS.behavior,
-                width: localStorage.getItem('eclipse_width') || DEFAULTS.width,
-                height: localStorage.getItem('eclipse_height') || DEFAULTS.height,
-                fullscreen: localStorage.getItem('eclipse_fullscreen') === 'true',
-                jvmFlags: localStorage.getItem('eclipse_jvm') || DEFAULTS.jvmFlags
-            };
+            playBtnWrapper.classList.add('disabled');
 
-            statusMsg.style.color = "#888888";
-            playBtn.innerText = "LAUNCHING...";
-            playBtnWrapper.style.opacity = "0.75";
-            playBtn.disabled = true;
-            ipcRenderer.send('launch-game', launchConfig);
+            if (!isInstalled) {
+                playBtn.innerText = "DOWNLOADING...";
+                statusText.innerText = "Preparing client files...";
+                ipcRenderer.send('download-client');
+            } else {
+                playBtn.innerText = "LAUNCHING...";
+                statusText.innerText = "Verifying game assets...";
+
+                ipcRenderer.send('launch-game', {
+                    username: username,
+                    authType: authType,
+                    msToken: localStorage.getItem('eclipse_ms_token'),
+                    ram: ramSlider.value,
+                    behavior: launcherBehavior.value,
+                    width: resWidth.value,
+                    height: resHeight.value,
+                    fullscreen: fullscreenToggle.checked,
+                    jvmFlags: jvmFlags.value
+                });
+            }
         });
 
+        ipcRenderer.on('download-complete', () => {
+            isInstalled = true;
+            playBtn.innerText = "LAUNCH";
+            statusText.innerText = "";
+            playBtnWrapper.classList.remove('disabled');
+        });
+
+        // Dynamic progress handler (shows progress in subtext and button)
         ipcRenderer.on('launch-progress', (event, data) => {
-            if (data.type === 'status') {
-                statusMsg.innerText = data.task;
-            } else if (data.type === 'progress') {
-                statusMsg.innerText = `Verifying game files... (${data.percentage}%)`;
+            if (data.type === 'progress') {
+                const percent = Math.floor(data.percentage || 0);
+                if (!isInstalled) {
+                    playBtn.innerText = "DOWNLOADING...";
+                    statusText.innerText = `Downloading game files (${percent}%)`;
+                } else {
+                    playBtn.innerText = "VERIFYING...";
+                    statusText.innerText = `Verifying game files (${percent}%)`;
+                }
+            } else if (data.task) {
+                statusText.innerText = data.task;
             }
         });
 
         ipcRenderer.on('game-started', () => {
-            playBtn.innerText = "LAUNCHED";
-            statusMsg.innerText = "Game is currently running";
+            playBtn.innerText = "GAME RUNNING";
+            statusText.innerText = "Minecraft running";
         });
 
         ipcRenderer.on('game-closed', () => {
-            playBtn.innerText = "LAUNCH";
-            playBtnWrapper.style.opacity = "1";
-            playBtn.disabled = false;
-            statusMsg.innerText = "Ready to launch";
+            playBtn.innerText = isInstalled ? "LAUNCH" : "DOWNLOAD";
+            statusText.innerText = "";
+            playBtnWrapper.classList.remove('disabled');
         });
-
-        document.getElementById('closeBtn').addEventListener('click', () => window.close());
-        document.getElementById('minBtn').addEventListener('click', () => ipcRenderer.send('window-min'));
     </script>
 </body>
 </html>
