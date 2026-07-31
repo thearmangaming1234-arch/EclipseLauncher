@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs-extra');
 const https = require('https');
+const http = require('http');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require('msmc');
 
@@ -145,12 +146,33 @@ function fetchManifest() {
     });
 }
 
+/**
+ * Robust downloader that follows HTTP/HTTPS redirects for raw GitHub files
+ */
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {
-        const file = fs.createWriteStream(dest);
-        https.get(url, (response) => {
+        const protocol = url.startsWith('https') ? https : http;
+        
+        protocol.get(url, (response) => {
+            // Follow redirects (HTTP 301, 302, 303, 307, 308)
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                return downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+            }
+
+            if (response.statusCode !== 200) {
+                return reject(new Error(`Failed to download ${url}: HTTP ${response.statusCode}`));
+            }
+
+            const file = fs.createWriteStream(dest);
             response.pipe(file);
-            file.on('finish', () => file.close(resolve));
+
+            file.on('finish', () => {
+                file.close(resolve);
+            });
+
+            file.on('error', (err) => {
+                fs.unlink(dest, () => reject(err));
+            });
         }).on('error', (err) => {
             fs.unlink(dest, () => reject(err));
         });
