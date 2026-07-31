@@ -13,6 +13,15 @@ const RAW_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NA
 // Direct download URL for large files hosted on GitHub Releases
 const WATERMEDIA_RELEASE_URL = 'https://github.com/thearmangaming1234-arch/EclipseLauncher/releases/download/v1.0.0-assets/watermedia_binaries-3.0.0-rc.4.jar';
 
+// Helper function to safely format GitHub Raw URLs (keeps '+' intact for Fabric mod names)
+function buildGitHubUrl(relativePath) {
+    const cleanPath = relativePath
+        .split('/')
+        .map(segment => encodeURIComponent(segment).replace(/%2B/gi, '+'))
+        .join('/');
+    return `${RAW_BASE_URL}${cleanPath}`;
+}
+
 // Recursive function to scan all files inside client-files folder
 function getFilesRecursively(dir, baseDir = dir) {
     let results = [];
@@ -34,7 +43,7 @@ function getFilesRecursively(dir, baseDir = dir) {
             const relativePath = path.relative(baseDir, filePath).replace(/\\/g, '/');
             results.push({
                 path: relativePath,
-                url: `${RAW_BASE_URL}${relativePath}`
+                url: buildGitHubUrl(relativePath)
             });
         }
     });

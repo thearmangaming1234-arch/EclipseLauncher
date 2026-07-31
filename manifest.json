@@ -1,5 +1,5 @@
 {
-  "version": 1785512327733,
+  "version": 1785513284163,
   "files": [
     {
       "path": "config/badoptimizations.txt",
@@ -311,7 +311,7 @@
     },
     {
       "path": "config/paxi/resourcepacks/ECLIPS Essentials.zip",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/paxi/resourcepacks/ECLIPS Essentials.zip"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/config/paxi/resourcepacks/ECLIPS%20Essentials.zip"
     },
     {
       "path": "config/paxi/resourcepack_load_order.json",
@@ -379,11 +379,11 @@
     },
     {
       "path": "Eclipse Client.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse Client.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse%20Client.jar"
     },
     {
       "path": "Eclipse Client.json",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse Client.json"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/Eclipse%20Client.json"
     },
     {
       "path": "fancymenu_data/action_favorites.json",
@@ -591,7 +591,7 @@
     },
     {
       "path": "mods/chatpatches-8.0-alpha.8%2B1.20.1-fabric.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/chatpatches-8.0-alpha.8%2B1.20.1-fabric.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/chatpatches-8.0-alpha.8%252B1.20.1-fabric.jar"
     },
     {
       "path": "mods/citresewn-1.2.2+1.20.1.jar",
@@ -615,7 +615,7 @@
     },
     {
       "path": "mods/commandkeys-fabric-2.4.0%2B1.20.1.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/commandkeys-fabric-2.4.0%2B1.20.1.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/commandkeys-fabric-2.4.0%252B1.20.1.jar"
     },
     {
       "path": "mods/continuity-3.0.0+1.20.1.jar",
@@ -659,11 +659,11 @@
     },
     {
       "path": "mods/fabric-api-0.92.11%2B1.20.1.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-api-0.92.11%2B1.20.1.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-api-0.92.11%252B1.20.1.jar"
     },
     {
       "path": "mods/fabric-language-kotlin-1.13.13%2Bkotlin.2.4.10.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-language-kotlin-1.13.13%2Bkotlin.2.4.10.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/fabric-language-kotlin-1.13.13%252Bkotlin.2.4.10.jar"
     },
     {
       "path": "mods/fancymenu_fabric_3.9.8_MC_1.20.1.jar",
@@ -695,7 +695,7 @@
     },
     {
       "path": "mods/ImmediatelyFast-Fabric-1.5.5%2B1.20.4.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/ImmediatelyFast-Fabric-1.5.5%2B1.20.4.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/ImmediatelyFast-Fabric-1.5.5%252B1.20.4.jar"
     },
     {
       "path": "mods/indium-1.0.36+mc1.20.1.jar",
@@ -751,7 +751,7 @@
     },
     {
       "path": "mods/modernfix-fabric-5.25.2%2Bmc1.20.1.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/modernfix-fabric-5.25.2%2Bmc1.20.1.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/modernfix-fabric-5.25.2%252Bmc1.20.1.jar"
     },
     {
       "path": "mods/modmenu-7.2.2.jar",
@@ -803,7 +803,7 @@
     },
     {
       "path": "mods/Simple-Block-Overlay 1.20.x-fabric-1.4.3.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Simple-Block-Overlay 1.20.x-fabric-1.4.3.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/Simple-Block-Overlay%201.20.x-fabric-1.4.3.jar"
     },
     {
       "path": "mods/SmoothScrollingRefurbished+1.20-1.1.2.jar",
@@ -823,7 +823,7 @@
     },
     {
       "path": "mods/UniLib-1.2.1%2B1.20.1-fabric.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/UniLib-1.2.1%2B1.20.1-fabric.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/UniLib-1.2.1%252B1.20.1-fabric.jar"
     },
     {
       "path": "mods/viafabricplus-2.8.7.jar",
@@ -847,7 +847,7 @@
     },
     {
       "path": "mods/zoomify-2.15.2%2B1.20.1.jar",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/zoomify-2.15.2%2B1.20.1.jar"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/zoomify-2.15.2%252B1.20.1.jar"
     },
     {
       "path": "MoreCosmetics/data/config/843835f0-5dfa-11ed-9a7e-f02f74958c02.json",
@@ -1023,11 +1023,11 @@
     },
     {
       "path": "resourcepacks/Mini Items.zip",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Mini Items.zip"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Mini%20Items.zip"
     },
     {
       "path": "resourcepacks/Offline Nametag Icon Tempelate [SyanicXD].zip",
-      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Offline Nametag Icon Tempelate [SyanicXD].zip"
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/resourcepacks/Offline%20Nametag%20Icon%20Tempelate%20%5BSyanicXD%5D.zip"
     },
     {
       "path": "rhino.local.properties",
