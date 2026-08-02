@@ -97,7 +97,7 @@ function createWindow() {
 
 app.whenReady().then(createWindow);
 
-// Force application exit when windows are closed (Fixes Ghost Window Issue)
+// Force application exit when windows are closed
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
@@ -114,7 +114,7 @@ ipcMain.on('window-min', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('window-close', () => { 
     if (mainWindow) mainWindow.close(); 
-    app.quit(); // Ensures all child auth processes quit cleanly
+    app.quit();
 });
 ipcMain.on('get-game-path', (event) => { event.reply('game-path', GAME_ROOT); });
 
@@ -128,7 +128,6 @@ ipcMain.on('check-install-status', (event) => {
 
 ipcMain.on('ms-login-start', async (event) => {
     try {
-        // MSMC launch window handler
         const xboxManager = await msmcAuth.launch("electron");
         const token = await xboxManager.getMinecraft();
 
@@ -180,7 +179,7 @@ function downloadFile(url, dest) {
 
 async function checkAndDownloadUpdates(event) {
     try {
-        event.reply('launch-progress', { type: 'status', task: "Checking updates..." });
+        event.reply('download-progress', { percent: 0, task: "Verifying files..." });
         const manifest = await fetchManifest();
         if (manifest.files && manifest.files.length > 0) {
             let count = 0;
@@ -190,10 +189,11 @@ async function checkAndDownloadUpdates(event) {
                 const targetFilePath = path.join(GAME_ROOT, item.path);
                 if (shouldSkipSync(item.path, targetFilePath)) continue;
 
-                event.reply('launch-progress', { 
-                    type: 'progress', 
-                    percentage: Math.round((count / total) * 100),
-                    task: `Downloading (${count}/${total}): ${path.basename(item.path)}...` 
+                const percent = Math.round((count / total) * 100);
+                
+                event.reply('download-progress', { 
+                    percent: percent,
+                    task: "Verifying files..." 
                 });
 
                 try {
@@ -227,15 +227,16 @@ async function syncClientFiles(targetDir) {
     }
 }
 
-ipcMain.on('download-client', async (event) => {
+ipcMain.on('start-download', async (event) => {
     try {
         await fs.ensureDir(GAME_ROOT);
         await checkAndDownloadUpdates(event);
         await syncClientFiles(GAME_ROOT);
-        event.reply('download-complete');
+        
         event.reply('install-status', isGameInstalled());
+        event.reply('game-launched');
     } catch (err) {
-        event.reply('launch-progress', { type: 'status', task: "Download failed!" });
+        event.reply('launch-error', "Download failed!");
     }
 });
 
@@ -250,10 +251,10 @@ ipcMain.on('launch-game', async (event, data) => {
             const refreshAuth = await msmcAuth.refresh(JSON.parse(data.msToken));
             authHeader = (await refreshAuth.getMinecraft()).mclc();
         } catch (e) {
-            authHeader = Authenticator.getAuth(data.username);
+            authHeader = Authenticator.getAuth(data.username || "Player");
         }
     } else {
-        authHeader = Authenticator.getAuth(data.username);
+        authHeader = Authenticator.getAuth(data.username || "Player");
     }
 
     const defaultJvmFlags = [
@@ -262,44 +263,66 @@ ipcMain.on('launch-game', async (event, data) => {
     ];
     const userJvmFlags = data.jvmFlags ? data.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
 
+    // Sync client blueprint files and manifest updates
     await checkAndDownloadUpdates(event);
     await syncClientFiles(GAME_ROOT);
 
-    const preferredJavaPath = "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.8-hotspot\\bin\\java.exe";
-    const customJava = fs.existsSync(preferredJavaPath) ? preferredJavaPath : undefined;
-
+    // Configured for custom fabric loader profile
     let opts = {
         authorization: authHeader,
         root: GAME_ROOT,
-        version: { number: "1.20.1", type: "release", custom: "fabric-loader-0.19.3-1.20.1" },
+        version: { 
+            number: "1.20.1", 
+            type: "release",
+            custom: "fabric-loader-0.19.3-1.20.1"
+        },
         memory: { max: `${ramInMb}M`, min: "1024M" },
         window: { width: parseInt(data.width) || 854, height: parseInt(data.height) || 480, fullscreen: false },
         customArgs: [...defaultJvmFlags, ...userJvmFlags]
     };
-    if (customJava) opts.javaPath = customJava;
 
     launcher.removeAllListeners();
-    launcher.launch(opts);
 
+    // Event listeners for launcher state & status reporting
+    launcher.on('debug', (e) => console.log('[LAUNCHER DEBUG]', e));
     launcher.on('data', (e) => {
-        if (e.includes('Setting user:') || e.includes('Loading Minecraft')) {
-            event.reply('game-started');
+        console.log('[MINECRAFT LOG]', e);
+        if (e.includes('Setting user:') || e.includes('Loading Minecraft') || e.includes('OpenAL initialized')) {
+            event.reply('game-launched');
             if (behavior === 'hide' && mainWindow) mainWindow.hide();
             else if (behavior === 'close') app.quit();
         }
     });
 
+    let currentStep = 0;
     launcher.on('progress', (e) => {
-        event.reply('launch-progress', {
-            type: 'progress',
-            task: e.task,
-            percentage: e.total ? Math.round((e.task / e.total) * 100) : 0
+        currentStep++;
+        let percent = 0;
+        if (e.total && e.total > 0) {
+            percent = Math.min(100, Math.round((e.current / e.total) * 100));
+        } else {
+            // Smooth progress estimation when e.total is missing
+            percent = Math.min(99, currentStep * 5);
+        }
+
+        event.reply('download-progress', {
+            percent: percent,
+            task: "Verifying files..."
         });
     });
 
-    launcher.on('close', () => {
+    launcher.on('close', (code) => {
+        console.log('[GAME CLOSED]', code);
         if (behavior === 'hide' && mainWindow) mainWindow.show();
         event.reply('install-status', isGameInstalled());
-        event.reply('game-closed');
+        event.reply('game-launched');
     });
+
+    try {
+        event.reply('download-progress', { percent: 100, task: "Launching Minecraft..." });
+        await launcher.launch(opts);
+    } catch (err) {
+        console.error("Failed to launch game:", err);
+        event.reply('launch-error', err.message || "Launch failed!");
+    }
 });

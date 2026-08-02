@@ -31,7 +31,7 @@
                         </svg>
                     </button>
 
-                    <!-- User Account Box (Ely.by skin head stays intact here) -->
+                    <!-- User Account Box -->
                     <div class="account-box" id="accountBtn">
                         <img id="avatarImg" class="account-avatar" src="https://mc-heads.net/avatar/steve/26" alt="Head">
                         <span id="accountName" class="account-name">No Account</span>
@@ -193,6 +193,7 @@
 
         let isInstalled = false;
         let isOfflineMode = false;
+        let isLaunching = false;
 
         document.getElementById('minBtn').addEventListener('click', () => ipcRenderer.send('window-min'));
         document.getElementById('closeBtn').addEventListener('click', () => ipcRenderer.send('window-close'));
@@ -272,10 +273,10 @@
             return /^[a-zA-Z0-9_]{3,16}$/.test(username);
         }
 
-        // Dedicated Ely.by Head Renderer for User Avatar Box
         function loadElyBySkinHead(username, avatarImg, fallbackUrl) {
             const elySkinUrl = `https://skinsystem.ely.by/skins/${username}.png`;
             const testImg = new Image();
+            testImg.crossOrigin = 'Anonymous';
 
             testImg.onload = function () {
                 avatarImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -491,6 +492,44 @@
             }
         });
 
+        ipcRenderer.on('download-progress', (event, progress) => {
+            if (isLaunching) return; // Prevent overwriting "An Eclipse is forming..." state
+
+            if (typeof progress === 'object' && progress !== null) {
+                const task = progress.task || 'Verifying files...';
+                let percent = Number(progress.percent);
+
+                // Prevent NaN% display
+                if (!isNaN(percent) && isFinite(percent)) {
+                    percent = Math.round(percent);
+                    statusText.innerText = `${task} (${percent}%)`;
+                    
+                    if (percent >= 100) {
+                        isLaunching = true;
+                        statusText.innerText = "An Eclipse is forming...";
+                    }
+                } else {
+                    statusText.innerText = task;
+                }
+            } else if (typeof progress === 'string') {
+                statusText.innerText = progress;
+            }
+        });
+
+        ipcRenderer.on('game-launched', () => {
+            isLaunching = false;
+            playBtnWrapper.classList.remove('disabled');
+            playBtn.innerText = "LAUNCH";
+            statusText.innerText = "";
+        });
+
+        ipcRenderer.on('launch-error', (event, err) => {
+            isLaunching = false;
+            playBtnWrapper.classList.remove('disabled');
+            playBtn.innerText = isInstalled ? "LAUNCH" : "DOWNLOAD";
+            statusText.innerText = `Error: ${err}`;
+        });
+
         playBtn.addEventListener('click', () => {
             const username = localStorage.getItem('eclipse_username');
             const authType = localStorage.getItem('eclipse_auth_type') || 'ely';
@@ -500,15 +539,16 @@
                 return;
             }
 
+            isLaunching = false;
             playBtnWrapper.classList.add('disabled');
 
             if (!isInstalled) {
                 playBtn.innerText = "DOWNLOADING...";
-                statusText.innerText = "Preparing client files...";
+                statusText.innerText = "Preparing client files (0%)...";
                 ipcRenderer.send('start-download');
             } else {
                 playBtn.innerText = "LAUNCHING...";
-                statusText.innerText = "Starting Minecraft...";
+                statusText.innerText = "Verifying files... (0%)";
                 ipcRenderer.send('launch-game', { username, authType });
             }
         });
