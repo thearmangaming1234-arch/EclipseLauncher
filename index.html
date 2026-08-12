@@ -469,7 +469,7 @@
         });
 
         document.getElementById('discordBtn').addEventListener('click', () => {
-            shell.openExternal('https://discord.gg');
+            shell.openExternal('https://discord.gg/TsDcTmcpxx');
         });
 
         /* DYNAMIC INSTALLATION & STATUS SYSTEM */
@@ -549,7 +549,18 @@
             } else {
                 playBtn.innerText = "LAUNCHING...";
                 statusText.innerText = "Verifying files... (0%)";
-                ipcRenderer.send('launch-game', { username, authType });
+
+                // Gather saved settings safely without deleting them from localstorage!
+                const settings = {
+                    ram: localStorage.getItem('eclipse_ram') || DEFAULTS.ram,
+                    behavior: localStorage.getItem('eclipse_behavior') || DEFAULTS.behavior,
+                    width: localStorage.getItem('eclipse_width') || DEFAULTS.width,
+                    height: localStorage.getItem('eclipse_height') || DEFAULTS.height,
+                    fullscreen: localStorage.getItem('eclipse_fullscreen') === 'true',
+                    jvmFlags: localStorage.getItem('eclipse_jvm') || DEFAULTS.jvmFlags
+                };
+
+                ipcRenderer.send('launch-game', { username, authType, settings });
             }
         });
     </script>

@@ -192,7 +192,7 @@ async function checkAndDownloadUpdates(event) {
                 const percent = Math.round((count / total) * 100);
                 
                 event.reply('download-progress', { 
-                    percent: percent,
+                    percent: percent, 
                     task: "Verifying files..." 
                 });
 
@@ -241,9 +241,14 @@ ipcMain.on('start-download', async (event) => {
 });
 
 ipcMain.on('launch-game', async (event, data) => {
+    // Correctly extract nested settings sent from index.html!
+    const settings = data.settings || {};
     const authType = data.authType || 'cracked';
-    const ramInMb = data.ram || "3478";
-    const behavior = data.behavior || "hide";
+    const ramInMb = settings.ram || "3584";
+    const behavior = settings.behavior || "hide";
+    const width = parseInt(settings.width) || 854;
+    const height = parseInt(settings.height) || 480;
+    const fullscreen = Boolean(settings.fullscreen);
 
     let authHeader;
     if (authType === 'microsoft' && data.msToken) {
@@ -261,7 +266,7 @@ ipcMain.on('launch-game', async (event, data) => {
         "-Dfabric.log.level=info", "-XX:+UseG1GC", "-XX:+ParallelRefProcEnabled",
         "-XX:MaxGCPauseMillis=200", "-XX:+UnlockExperimentalVMOptions", "-XX:+DisableExplicitGC"
     ];
-    const userJvmFlags = data.jvmFlags ? data.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
+    const userJvmFlags = settings.jvmFlags ? settings.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
 
     // Sync client blueprint files and manifest updates
     await checkAndDownloadUpdates(event);
@@ -277,20 +282,27 @@ ipcMain.on('launch-game', async (event, data) => {
             custom: "fabric-loader-0.19.3-1.20.1"
         },
         memory: { max: `${ramInMb}M`, min: "1024M" },
-        window: { width: parseInt(data.width) || 854, height: parseInt(data.height) || 480, fullscreen: false },
+        window: { width, height, fullscreen },
         customArgs: [...defaultJvmFlags, ...userJvmFlags]
     };
 
     launcher.removeAllListeners();
 
+    let hasTriggeredLaunch = false;
+
     // Event listeners for launcher state & status reporting
     launcher.on('debug', (e) => console.log('[LAUNCHER DEBUG]', e));
     launcher.on('data', (e) => {
         console.log('[MINECRAFT LOG]', e);
-        if (e.includes('Setting user:') || e.includes('Loading Minecraft') || e.includes('OpenAL initialized')) {
+        if (!hasTriggeredLaunch && (e.includes('Setting user:') || e.includes('Loading Minecraft') || e.includes('OpenAL initialized'))) {
+            hasTriggeredLaunch = true;
             event.reply('game-launched');
-            if (behavior === 'hide' && mainWindow) mainWindow.hide();
-            else if (behavior === 'close') app.quit();
+
+            if (behavior === 'hide' && mainWindow) {
+                mainWindow.hide();
+            } else if (behavior === 'close') {
+                app.quit();
+            }
         }
     });
 
@@ -313,7 +325,9 @@ ipcMain.on('launch-game', async (event, data) => {
 
     launcher.on('close', (code) => {
         console.log('[GAME CLOSED]', code);
-        if (behavior === 'hide' && mainWindow) mainWindow.show();
+        if (behavior === 'hide' && mainWindow) {
+            mainWindow.show();
+        }
         event.reply('install-status', isGameInstalled());
         event.reply('game-launched');
     });
