@@ -194,6 +194,7 @@
         let isInstalled = false;
         let isOfflineMode = false;
         let isLaunching = false;
+        let isGameRunning = false;
 
         document.getElementById('minBtn').addEventListener('click', () => ipcRenderer.send('window-min'));
         document.getElementById('closeBtn').addEventListener('click', () => ipcRenderer.send('window-close'));
@@ -481,25 +482,25 @@
 
         ipcRenderer.on('install-status', (event, installed) => {
             isInstalled = installed;
-            playBtnWrapper.classList.remove('disabled');
-
-            if (installed) {
-                playBtn.innerText = "LAUNCH";
-                statusText.innerText = "";
-            } else {
-                playBtn.innerText = "DOWNLOAD";
-                statusText.innerText = "";
+            if (!isGameRunning) {
+                playBtnWrapper.classList.remove('disabled');
+                if (installed) {
+                    playBtn.innerText = "LAUNCH";
+                    statusText.innerText = "";
+                } else {
+                    playBtn.innerText = "DOWNLOAD";
+                    statusText.innerText = "";
+                }
             }
         });
 
         ipcRenderer.on('download-progress', (event, progress) => {
-            if (isLaunching) return; // Prevent overwriting "An Eclipse is forming..." state
+            if (isLaunching || isGameRunning) return; // Prevent overwriting
 
             if (typeof progress === 'object' && progress !== null) {
                 const task = progress.task || 'Verifying files...';
                 let percent = Number(progress.percent);
 
-                // Prevent NaN% display
                 if (!isNaN(percent) && isFinite(percent)) {
                     percent = Math.round(percent);
                     statusText.innerText = `${task} (${percent}%)`;
@@ -518,6 +519,15 @@
 
         ipcRenderer.on('game-launched', () => {
             isLaunching = false;
+            isGameRunning = true;
+            playBtnWrapper.classList.add('disabled');
+            playBtn.innerText = "LAUNCHED";
+            statusText.innerText = "Enjoy!";
+        });
+
+        ipcRenderer.on('game-closed', () => {
+            isGameRunning = false;
+            isLaunching = false;
             playBtnWrapper.classList.remove('disabled');
             playBtn.innerText = "LAUNCH";
             statusText.innerText = "";
@@ -525,12 +535,15 @@
 
         ipcRenderer.on('launch-error', (event, err) => {
             isLaunching = false;
+            isGameRunning = false;
             playBtnWrapper.classList.remove('disabled');
             playBtn.innerText = isInstalled ? "LAUNCH" : "DOWNLOAD";
             statusText.innerText = `Error: ${err}`;
         });
 
         playBtn.addEventListener('click', () => {
+            if (isGameRunning) return;
+
             const username = localStorage.getItem('eclipse_username');
             const authType = localStorage.getItem('eclipse_auth_type') || 'ely';
 
@@ -550,7 +563,6 @@
                 playBtn.innerText = "LAUNCHING...";
                 statusText.innerText = "Verifying files... (0%)";
 
-                // Gather saved settings safely without deleting them from localstorage!
                 const settings = {
                     ram: localStorage.getItem('eclipse_ram') || DEFAULTS.ram,
                     behavior: localStorage.getItem('eclipse_behavior') || DEFAULTS.behavior,

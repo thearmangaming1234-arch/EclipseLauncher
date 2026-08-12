@@ -234,14 +234,13 @@ ipcMain.on('start-download', async (event) => {
         await syncClientFiles(GAME_ROOT);
         
         event.reply('install-status', isGameInstalled());
-        event.reply('game-launched');
     } catch (err) {
         event.reply('launch-error', "Download failed!");
     }
 });
 
 ipcMain.on('launch-game', async (event, data) => {
-    // Correctly extract nested settings sent from index.html!
+    // Extract nested settings sent from index.html
     const settings = data.settings || {};
     const authType = data.authType || 'cracked';
     const ramInMb = settings.ram || "3584";
@@ -329,11 +328,11 @@ ipcMain.on('launch-game', async (event, data) => {
             mainWindow.show();
         }
         event.reply('install-status', isGameInstalled());
-        event.reply('game-launched');
+        event.reply('game-closed');
     });
 
     try {
-        event.reply('download-progress', { percent: 100, task: "Launching Minecraft..." });
+        event.reply('download-progress', { percent: 100, task: "An Eclipse is forming..." });
         await launcher.launch(opts);
     } catch (err) {
         console.error("Failed to launch game:", err);
