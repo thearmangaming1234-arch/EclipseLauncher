@@ -1,5 +1,5 @@
 {
-  "version": 1786551896568,
+  "version": 1786555320072,
   "files": [
     {
       "path": "config/badoptimizations.txt",
@@ -840,6 +840,10 @@
     {
       "path": "mods/sodium-fabric-0.5.13+mc1.20.1.jar",
       "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/sodium-fabric-0.5.13+mc1.20.1.jar"
+    },
+    {
+      "path": "mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar",
+      "url": "https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/client-files/mods/tl_skin_cape_fabric_1.20_1.20.1-1.38.jar"
     },
     {
       "path": "mods/UniLib-1.2.1%2B1.20.1-fabric.jar",

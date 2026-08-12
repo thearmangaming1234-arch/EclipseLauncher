@@ -132,12 +132,28 @@
             <h3 class="modal-title">Account Login</h3>
             
             <div class="auth-type-tabs">
-                <button class="auth-tab-btn active" id="tabMsBtn">Microsoft</button>
-                <button class="auth-tab-btn" id="tabElyBtn">Ely.by Account</button>
+                <button class="auth-tab-btn active" id="tabCrackedBtn">Cracked Account</button>
+                <button class="auth-tab-btn" id="tabMsBtn">Microsoft</button>
+            </div>
+
+            <!-- Cracked Panel -->
+            <div class="auth-panel active" id="crackedPanel">
+                <div class="ely-info-banner">
+                    💡 <strong>Skin Note:</strong> To set your skin, you need to make an account on <strong style="color: #ffb703;">TLauncher.org</strong> and set your skin there.
+                </div>
+
+                <div class="input-stack">
+                    <input type="text" id="crackedUsernameInput" placeholder="Enter Username..." maxlength="16" />
+                    <button class="action-btn" id="saveCrackedBtn">Save Account</button>
+                </div>
+
+                <div class="sub-links" style="justify-content: center; margin-top: 12px;">
+                    <a href="#" id="createTLauncherAccountLink" class="ely-link-gold">Create a TLauncher account</a>
+                </div>
             </div>
 
             <!-- Microsoft Panel -->
-            <div class="auth-panel active" id="msPanel">
+            <div class="auth-panel" id="msPanel">
                 <p class="ms-login-desc">
                     Log in with official Minecraft account to play on Hypixel & Premium servers.
                 </p>
@@ -145,30 +161,6 @@
                     <svg width="18" height="18" viewBox="0 0 23 23"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H1z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H1z"/></svg>
                     Login via Microsoft
                 </button>
-            </div>
-
-            <!-- Ely.by / Offline Panel -->
-            <div class="auth-panel" id="elyPanel">
-                
-                <div class="ely-info-banner" id="elyInfoBanner">
-                    ✨ <strong>Ely.by Authentication:</strong> Log in with your Ely.by account to access online play.
-                </div>
-
-                <div class="input-stack" id="elyFormStack">
-                    <input type="text" id="elyUserInput" placeholder="Username or Email..." maxlength="32" />
-                    
-                    <div class="password-wrapper" id="passWrapper">
-                        <input type="password" id="elyPassInput" placeholder="Password..." />
-                        <button type="button" class="toggle-password-btn" id="togglePassBtn" title="Toggle Password Visibility">👁️</button>
-                    </div>
-
-                    <button class="action-btn" id="loginElyBtn">Login to ECLIPSE</button>
-                </div>
-
-                <div class="sub-links">
-                    <a href="#" id="registerElyLink" class="ely-link-gold">Register Account</a>
-                    <a href="#" id="toggleOfflineLink" class="ely-link-muted">Use Offline Mode</a>
-                </div>
             </div>
 
             <div class="modal-error" id="modalError"></div>
@@ -192,7 +184,6 @@
         };
 
         let isInstalled = false;
-        let isOfflineMode = false;
         let isLaunching = false;
         let isGameRunning = false;
 
@@ -267,7 +258,6 @@
             jvmFlags.value = DEFAULTS.jvmFlags;
         });
 
-        let currentAuthType = localStorage.getItem('eclipse_auth_type') || 'ely'; 
         let savedUser = localStorage.getItem('eclipse_username') || null;
 
         function validateMinecraftUsername(username) {
@@ -306,13 +296,8 @@
                 avatarImg.src = `https://mc-heads.net/avatar/steve/26`;
             } else {
                 accountName.innerText = username;
-                if (currentAuthType === 'ely' || currentAuthType === 'cracked') {
-                    const defaultFallback = `https://mc-heads.net/avatar/${username}/26`;
-                    loadElyBySkinHead(username, avatarImg, defaultFallback);
-                } else {
-                    avatarImg.style.backgroundImage = 'none';
-                    avatarImg.src = `https://mc-heads.net/avatar/${username}/26`;
-                }
+                const defaultFallback = `https://mc-heads.net/avatar/${username}/26`;
+                loadElyBySkinHead(username, avatarImg, defaultFallback);
             }
         }
 
@@ -320,72 +305,38 @@
 
         const modal = document.getElementById('accountModal');
         const modalError = document.getElementById('modalError');
+        const tabCrackedBtn = document.getElementById('tabCrackedBtn');
         const tabMsBtn = document.getElementById('tabMsBtn');
-        const tabElyBtn = document.getElementById('tabElyBtn');
+        const crackedPanel = document.getElementById('crackedPanel');
         const msPanel = document.getElementById('msPanel');
-        const elyPanel = document.getElementById('elyPanel');
-        const elyUserInput = document.getElementById('elyUserInput');
-        const elyPassInput = document.getElementById('elyPassInput');
-        const passWrapper = document.getElementById('passWrapper');
-        const togglePassBtn = document.getElementById('togglePassBtn');
-        const elyInfoBanner = document.getElementById('elyInfoBanner');
-        const loginElyBtn = document.getElementById('loginElyBtn');
-        const registerElyLink = document.getElementById('registerElyLink');
-        const toggleOfflineLink = document.getElementById('toggleOfflineLink');
+        const crackedUsernameInput = document.getElementById('crackedUsernameInput');
+        const saveCrackedBtn = document.getElementById('saveCrackedBtn');
+        const createTLauncherAccountLink = document.getElementById('createTLauncherAccountLink');
 
-        togglePassBtn.addEventListener('click', () => {
-            if (elyPassInput.type === 'password') {
-                elyPassInput.type = 'text';
-                togglePassBtn.innerText = '🙈';
-            } else {
-                elyPassInput.type = 'password';
-                togglePassBtn.innerText = '👁️';
-            }
-        });
-
-        tabMsBtn.addEventListener('click', () => {
-            tabMsBtn.classList.add('active');
-            tabElyBtn.classList.remove('active');
-            msPanel.classList.add('active');
-            elyPanel.classList.remove('active');
-            modalError.style.display = 'none';
-        });
-
-        tabElyBtn.addEventListener('click', () => {
-            tabElyBtn.classList.add('active');
+        tabCrackedBtn.addEventListener('click', () => {
+            tabCrackedBtn.classList.add('active');
             tabMsBtn.classList.remove('active');
-            elyPanel.classList.add('active');
+            crackedPanel.classList.add('active');
             msPanel.classList.remove('active');
             modalError.style.display = 'none';
         });
 
-        registerElyLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            shell.openExternal('https://ely.by/registration');
+        tabMsBtn.addEventListener('click', () => {
+            tabMsBtn.classList.add('active');
+            tabCrackedBtn.classList.remove('active');
+            msPanel.classList.add('active');
+            crackedPanel.classList.remove('active');
+            modalError.style.display = 'none';
         });
 
-        toggleOfflineLink.addEventListener('click', (e) => {
+        createTLauncherAccountLink.addEventListener('click', (e) => {
             e.preventDefault();
-            isOfflineMode = !isOfflineMode;
-            modalError.style.display = 'none';
-
-            if (isOfflineMode) {
-                elyUserInput.placeholder = "Offline Username...";
-                passWrapper.style.display = 'none';
-                elyInfoBanner.style.display = 'none';
-                loginElyBtn.innerText = 'Save Offline Account';
-                toggleOfflineLink.innerText = 'Use Ely.by Login';
-            } else {
-                elyUserInput.placeholder = "Username or Email...";
-                passWrapper.style.display = 'flex';
-                elyInfoBanner.style.display = 'block';
-                loginElyBtn.innerText = 'Login to ECLIPSE';
-                toggleOfflineLink.innerText = 'Use Offline Mode';
-            }
+            shell.openExternal('https://tlauncher.org/en/reg/');
         });
 
         document.getElementById('accountBtn').addEventListener('click', () => {
             modalError.style.display = 'none';
+            if (savedUser) crackedUsernameInput.value = savedUser;
             modal.style.display = 'flex';
         });
 
@@ -393,74 +344,22 @@
             modal.style.display = 'none';
         });
 
-        loginElyBtn.addEventListener('click', async () => {
-            const userVal = elyUserInput.value.trim();
-            const passVal = elyPassInput.value.trim();
+        saveCrackedBtn.addEventListener('click', () => {
+            const userVal = crackedUsernameInput.value.trim();
 
-            if (isOfflineMode) {
-                if (!validateMinecraftUsername(userVal)) {
-                    modalError.style.color = "#ff4d4d";
-                    modalError.innerText = "Invalid username! Must be 3-16 characters (letters, numbers, underscores only).";
-                    modalError.style.display = 'block';
-                    return;
-                }
-
-                localStorage.setItem('eclipse_auth_type', 'cracked');
-                localStorage.setItem('eclipse_username', userVal);
-                currentAuthType = 'cracked';
-                updateAccountUI(userVal);
-                modal.style.display = 'none';
-                return;
-            }
-
-            if (!userVal) {
+            if (!validateMinecraftUsername(userVal)) {
                 modalError.style.color = "#ff4d4d";
-                modalError.innerText = "Please enter a username or email!";
+                modalError.innerText = "Invalid username! Must be 3-16 characters (letters, numbers, underscores only).";
                 modalError.style.display = 'block';
                 return;
             }
 
-            if (!passVal) {
-                modalError.style.color = "#ff4d4d";
-                modalError.innerText = "Please enter your password!";
-                modalError.style.display = 'block';
-                return;
-            }
+            localStorage.setItem('eclipse_auth_type', 'cracked');
+            localStorage.setItem('eclipse_username', userVal);
+            savedUser = userVal;
 
-            modalError.style.color = "#ffb703";
-            modalError.innerText = "Authenticating with Ely.by...";
-            modalError.style.display = 'block';
-
-            try {
-                const response = await fetch('https://authserver.ely.by/auth/authenticate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username: userVal,
-                        password: passVal,
-                        requestUser: true
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.selectedProfile) {
-                    const loggedUsername = data.selectedProfile.name;
-                    localStorage.setItem('eclipse_auth_type', 'ely');
-                    localStorage.setItem('eclipse_username', loggedUsername);
-                    localStorage.setItem('eclipse_accessToken', data.accessToken);
-
-                    currentAuthType = 'ely';
-                    updateAccountUI(loggedUsername);
-                    modal.style.display = 'none';
-                } else {
-                    modalError.style.color = "#ff4d4d";
-                    modalError.innerText = data.errorMessage || "Invalid login credentials!";
-                }
-            } catch (err) {
-                modalError.style.color = "#ff4d4d";
-                modalError.innerText = "Failed to connect to authentication server!";
-            }
+            updateAccountUI(userVal);
+            modal.style.display = 'none';
         });
 
         document.getElementById('msLoginBtn').addEventListener('click', () => {
@@ -495,7 +394,7 @@
         });
 
         ipcRenderer.on('download-progress', (event, progress) => {
-            if (isLaunching || isGameRunning) return; // Prevent overwriting
+            if (isLaunching || isGameRunning) return;
 
             if (typeof progress === 'object' && progress !== null) {
                 const task = progress.task || 'Verifying files...';
@@ -545,7 +444,7 @@
             if (isGameRunning) return;
 
             const username = localStorage.getItem('eclipse_username');
-            const authType = localStorage.getItem('eclipse_auth_type') || 'ely';
+            const authType = localStorage.getItem('eclipse_auth_type') || 'cracked';
 
             if (!username) {
                 modal.style.display = 'flex';

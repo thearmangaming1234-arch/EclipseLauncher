@@ -258,6 +258,7 @@ ipcMain.on('launch-game', async (event, data) => {
             authHeader = Authenticator.getAuth(data.username || "Player");
         }
     } else {
+        // Cracked/Offline auth mode
         authHeader = Authenticator.getAuth(data.username || "Player");
     }
 
