@@ -1,0 +1,29 @@
+type = customizablemenus
+
+de.keksuccino.drippyloadingscreen.customization.DrippyOverlayScreen {
+}
+
+net.minecraft.class_442 {
+}
+
+io.github.darkkronicle.kronhud.gui.screen.HudEditScreen {
+}
+
+net.minecraft.class_490 {
+}
+
+net.minecraft.class_476 {
+}
+
+net.minecraft.class_3872 {
+}
+
+net.minecraft.class_407 {
+}
+
+net.minecraft.class_433 {
+}
+
+net.minecraft.class_500 {
+}
+
