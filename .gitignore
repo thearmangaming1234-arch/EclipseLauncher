@@ -1,3 +1,5 @@
 .minecraft/
 node_modules/
 client-files/mods/watermedia_binaries*.jar
+dist
+extra

@@ -25,7 +25,6 @@ const launcher = new Client();
 const msmcAuth = new Auth("select_account");
 
 const MANIFEST_URL = 'https://raw.githubusercontent.com/thearmangaming1234-arch/EclipseLauncher/main/manifest.json';
-const CLIENT_FILES_DIR = path.join(__dirname, 'client-files');
 const GAME_ROOT = path.join(__dirname, '.minecraft');
 
 let mainWindow = null;
@@ -177,9 +176,11 @@ function downloadFile(url, dest) {
     });
 }
 
-async function checkAndDownloadUpdates(event) {
+async function checkAndDownloadUpdates(event, isInitialInstall = false) {
     try {
-        event.reply('download-progress', { percent: 0, task: "Verifying files..." });
+        const taskText = isInitialInstall ? "Downloading..." : "Verifying files...";
+        event.reply('download-progress', { percent: 0, task: taskText });
+        
         const manifest = await fetchManifest();
         if (manifest.files && manifest.files.length > 0) {
             let count = 0;
@@ -193,7 +194,7 @@ async function checkAndDownloadUpdates(event) {
                 
                 event.reply('download-progress', { 
                     percent: percent, 
-                    task: "Verifying files..." 
+                    task: taskText 
                 });
 
                 try {
@@ -209,29 +210,10 @@ async function checkAndDownloadUpdates(event) {
     }
 }
 
-async function syncClientFiles(targetDir) {
-    try {
-        if (await fs.pathExists(CLIENT_FILES_DIR)) {
-            await fs.copy(CLIENT_FILES_DIR, targetDir, {
-                overwrite: true,
-                errorOnExist: false,
-                filter: (src) => {
-                    const relativePath = path.relative(CLIENT_FILES_DIR, src);
-                    if (!relativePath) return true;
-                    return !shouldSkipSync(relativePath, path.join(targetDir, relativePath));
-                }
-            });
-        }
-    } catch (err) {
-        console.warn("Client sync warning:", err.message);
-    }
-}
-
 ipcMain.on('start-download', async (event) => {
     try {
         await fs.ensureDir(GAME_ROOT);
-        await checkAndDownloadUpdates(event);
-        await syncClientFiles(GAME_ROOT);
+        await checkAndDownloadUpdates(event, true);
         
         event.reply('install-status', isGameInstalled());
     } catch (err) {
@@ -268,9 +250,8 @@ ipcMain.on('launch-game', async (event, data) => {
     ];
     const userJvmFlags = settings.jvmFlags ? settings.jvmFlags.trim().split(/\s+/).filter(Boolean) : [];
 
-    // Sync client blueprint files and manifest updates
-    await checkAndDownloadUpdates(event);
-    await syncClientFiles(GAME_ROOT);
+    // Sync client blueprint files from GitHub manifest
+    await checkAndDownloadUpdates(event, false);
 
     // Configured for custom fabric loader profile
     let opts = {
