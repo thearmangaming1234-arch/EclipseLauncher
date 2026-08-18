@@ -5,6 +5,7 @@ const https = require('https');
 const http = require('http');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require('msmc');
+const { autoUpdater } = require('electron-updater');
 
 // Prevent multiple instances of the app from launching
 const gotTheLock = app.requestSingleInstanceLock();
@@ -94,7 +95,16 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+
+    // Check for launcher app updates automatically in production builds
+    if (app.isPackaged) {
+        autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+            console.warn("Auto-updater check failed:", err.message);
+        });
+    }
+});
 
 // Force application exit when windows are closed
 app.on('window-all-closed', () => {

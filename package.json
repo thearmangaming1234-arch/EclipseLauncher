@@ -1,6 +1,6 @@
 {
   "name": "eclipse-launcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Custom Eclipse Client Launcher",
   "main": "main.js",
   "repository": {
