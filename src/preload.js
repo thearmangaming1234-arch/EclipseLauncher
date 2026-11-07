@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld('eclipse', {
   },
   instances: {
     list: () => ipcRenderer.invoke('instances:list'),
+    versions: loader => ipcRenderer.invoke('instances:versions', loader),
+    performanceOptions: (version, loader) => ipcRenderer.invoke('performance:options', version, loader),
+    utilityOptions: (version, loader) => ipcRenderer.invoke('utility:options', version, loader),
+    eclipseCustomizationOptions: (version, loader) => ipcRenderer.invoke('eclipse-customization:options', version, loader),
+    tlSkinOptions: (version, loader) => ipcRenderer.invoke('tlskins:options', version, loader),
+    create: options => ipcRenderer.invoke('instance:create', options),
     install: folder => ipcRenderer.invoke('instance:install', folder),
     deleteFiles: folder => ipcRenderer.invoke('instance:delete-files', folder),
     resetPlaytime: folder => ipcRenderer.invoke('instance:reset-playtime', folder),
@@ -39,15 +45,18 @@ contextBridge.exposeInMainWorld('eclipse', {
       ipcRenderer.on('instance:launch-status', listener);
       return () => ipcRenderer.removeListener('instance:launch-status', listener);
     },
-    rename: (folder, name) => ipcRenderer.invoke('instance:rename', folder, name),
+    rename: (folder, name, icon) => ipcRenderer.invoke('instance:rename', folder, name, icon),
     launch: instance => ipcRenderer.invoke('instance:launch', instance)
   },
   mods: {
     list: folder => ipcRenderer.invoke('mods:list', folder),
-    openFolder: folder => ipcRenderer.invoke('mods:open-folder', folder),
+    openFolder: (folder, assetType) => ipcRenderer.invoke('mods:open-folder', folder, assetType),
+    listAssets: (folder, assetType) => ipcRenderer.invoke('mods:assets-list', folder, assetType),
+    removeAsset: (folder, fileName, assetType) => ipcRenderer.invoke('mods:assets-remove', folder, fileName, assetType),
+    installAsset: (folder, projectId, assetType) => ipcRenderer.invoke('mods:assets-install', folder, projectId, assetType),
     setEnabled: (folder, fileName, enabled) => ipcRenderer.invoke('mods:set-enabled', folder, fileName, enabled),
     remove: (folder, fileName) => ipcRenderer.invoke('mods:remove', folder, fileName),
-    search: (folder, query) => ipcRenderer.invoke('mods:search', folder, query),
+    search: (folder, query, options) => ipcRenderer.invoke('mods:search', folder, query, options),
     install: (folder, projectId) => ipcRenderer.invoke('mods:install', folder, projectId),
     onInstallProgress: callback => {
       const listener = (_, progress) => callback(progress);
@@ -58,5 +67,10 @@ contextBridge.exposeInMainWorld('eclipse', {
   news: {
     list: options => ipcRenderer.invoke('news:list', options),
     open: url => ipcRenderer.invoke('news:open', url)
+  },
+  diagnostics: {
+    list: () => ipcRenderer.invoke('diagnostics:list'),
+    read: id => ipcRenderer.invoke('diagnostics:read', id),
+    reportRendererError: report => ipcRenderer.send('diagnostics:renderer-error', report)
   }
 });
