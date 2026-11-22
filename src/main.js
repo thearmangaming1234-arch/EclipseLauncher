@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, nativeImage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const util = require('util');
-const http = require('http');
 const { Readable } = require('stream');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
@@ -12,22 +13,32 @@ const extractZip = require('extract-zip');
 const yauzl = require('yauzl');
 
 const isDev = !app.isPackaged;
-const appIconPath = path.join(__dirname, '..', 'assets', 'favicon.ico');
+// app.getAppPath() points at the project root in development and the packaged
+// app directory (often app.asar) after distribution. Never depend on cwd or a
+// developer machine's checkout path for app resources.
+const appRoot = app.getAppPath();
+const sourceDirectory = path.join(appRoot, 'src');
+const assetsDirectory = path.join(appRoot, 'assets');
+const LAUNCHER_VERSION = app.getVersion();
+const LAUNCHER_USER_AGENT = `EclipseLauncher/${LAUNCHER_VERSION}`;
+const appIconPath = path.join(assetsDirectory, 'favicon.ico');
 if (process.platform === 'win32') app.setAppUserModelId('com.eclipse.launcher');
-// During development, read the instances folder sitting next to src/.
-// In a packaged launcher, userData is used so the installed app can write to it.
+// Keep development instances beside the project. Installed instances belong
+// in userData, which remains writable regardless of where the app is installed.
 const instancesDir = isDev
-  ? path.join(__dirname, '..', 'instances')
+  ? path.join(appRoot, 'instances')
   : path.join(app.getPath('userData'), 'instances');
 const settingsFile = path.join(app.getPath('userData'), 'settings.json');
 const DEFAULT_BACKGROUND_NAME = 'Neon Eclipse Over Voxel Lakescape.png';
-const defaultBackgroundSource = path.join(app.getAppPath(), 'assets', DEFAULT_BACKGROUND_NAME);
+const defaultBackgroundSource = path.join(assetsDirectory, DEFAULT_BACKGROUND_NAME);
 const defaultBackgroundPath = path.join(app.getPath('userData'), 'backgrounds', DEFAULT_BACKGROUND_NAME);
 const launcherLogFile = path.join(app.getPath('userData'), 'logs', 'eclipse-launcher.log');
 const launcherLogBackupFile = `${launcherLogFile}.1`;
 const LAUNCHER_LOG_MAX_BYTES = 8 * 1024 * 1024;
 const DIAGNOSTIC_LOG_MAX_BYTES = 2 * 1024 * 1024;
 const fileVerificationCacheFile = path.join(app.getPath('userData'), 'file-verification-cache.json');
+let lastUpdateProgressLog = -10;
+let downloadedUpdateVersion = null;
 const MINECRAFT_RSS_FEEDS = [
   { url: 'https://www.minecraft.net/en-us/feeds/community-content/rss', source: 'Minecraft.net' }
 ];
@@ -187,7 +198,10 @@ function isInstanceInstalled(folder, metadata = {}) {
     if (!file || typeof file.path !== 'string' || !Number.isFinite(file.size)) return false;
     const runtimeFile = path.resolve(runtimeDirectory(runtimeComponent, runtimeVersion), file.path.replace(/[\\/]/g, path.sep));
     if (!runtimeFile.startsWith(`${path.resolve(runtimeDirectory(runtimeComponent, runtimeVersion))}${path.sep}`)) return false;
-    try { return fs.statSync(runtimeFile).isFile() && fs.statSync(runtimeFile).size === file.size; } catch { return false; }
+    try {
+      const stat = fs.statSync(runtimeFile);
+      return stat.isFile() && stat.size === file.size;
+    } catch { return false; }
   })) return false;
   const packReady = metadata.customInstance === true || (hasModJar(instancePath) && hasContentFile(config));
   const loader = String(metadata.loader || profile.loader || 'Fabric').toLowerCase();
@@ -196,7 +210,7 @@ function isInstanceInstalled(folder, metadata = {}) {
     (!profile.launchProfile || (launchProfile.id === profile.launchProfile && launchProfile.inheritsFrom === profile.version)) &&
     runtimeStamp.component === runtimeComponent && runtimeStamp.version === runtimeVersion &&
     ['fabric', 'vanilla', 'forge'].includes(loader) && String(metadata.version || profile.version) === profile.version &&
-    (release ? loader === 'fabric' : metadata.customInstance === true);
+    (metadata.customInstance === true || loader === 'fabric');
 }
 
 function safeInstanceFolder(name) {
@@ -256,6 +270,25 @@ function listDiagnosticLogs() {
   return logs.sort((a, b) => (a.source === 'launcher' ? 0 : 1) - (b.source === 'launcher' ? 0 : 1) || b.modified.localeCompare(a.modified));
 }
 
+function deleteDiagnosticCrashReport(id) {
+  if (typeof id !== 'string' || id.length > 512) throw new Error('Choose a valid crash report.');
+  const entry = listDiagnosticLogs().find(item => item.id === id);
+  if (!entry || entry.source !== 'crash') throw new Error('Only Minecraft crash reports can be deleted here.');
+  const [, folder, type, filename] = id.split('|');
+  if (type !== 'crash' || !folder || !filename || path.basename(filename) !== filename || !/^crash-.*\.txt$/i.test(filename)) {
+    throw new Error('That crash report could not be found.');
+  }
+  const { instancePath } = getInstanceMetadata(folder);
+  const crashDirectory = path.join(instancePath, 'crash-reports');
+  const directoryStat = fs.lstatSync(crashDirectory);
+  if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) throw new Error('That crash report folder is invalid.');
+  const crashPath = path.join(crashDirectory, filename);
+  const reportStat = fs.lstatSync(crashPath);
+  if (!reportStat.isFile() || reportStat.isSymbolicLink()) throw new Error('That crash report is invalid.');
+  fs.unlinkSync(crashPath);
+  return { deleted: true };
+}
+
 function readDiagnosticLog(id) {
   if (typeof id !== 'string' || id.length > 512) throw new Error('Choose a valid log.');
   const entry = listDiagnosticLogs().find(item => item.id === id);
@@ -294,11 +327,20 @@ function javaRuntimeComponent(majorVersion) {
 }
 
 function sendInstallProgress(event, folder, progress) {
-  if (!event.sender.isDestroyed()) event.sender.send('instance:install-progress', { folder, ...progress });
+  const sender = event?.sender;
+  if (!sender || sender.isDestroyed()) return;
+  sender.send('instance:install-progress', { folder, ...progress });
 }
 
 function sendLaunchStatus(event, folder, status) {
   if (!event.sender.isDestroyed()) event.sender.send('instance:launch-status', { folder, ...status });
+}
+
+function formatProcessExitCode(code) {
+  if (!Number.isInteger(code)) return String(code);
+  const unsigned = code >>> 0;
+  const signed = unsigned >= 0x80000000 ? unsigned - 0x100000000 : unsigned;
+  return signed < 0 ? `${signed} (0x${unsigned.toString(16).toUpperCase().padStart(8, '0')})` : String(signed);
 }
 
 function getFileVerificationCache() {
@@ -373,7 +415,7 @@ function optimizeMinecraftFileChecks(handler, instanceRoot) {
   };
 }
 
-function configureLauncherHandler(launcher, javaProbePath, instanceRoot, strictDownloads = false) {
+function configureLauncherHandler(launcher, javaProbePath, instanceRoot, strictDownloads = false, skipJavaProbe = false) {
   // minecraft-launcher-core creates its Handler inside launch(), immediately before
   // probing Java. Intercept that assignment so both customizations are installed before
   // its first checksum or Java-version check runs.
@@ -385,7 +427,11 @@ function configureLauncherHandler(launcher, javaProbePath, instanceRoot, strictD
       handlerInstance = handler;
       if (typeof handler?.checkJava === 'function') {
         const checkJava = handler.checkJava.bind(handler);
-        handler.checkJava = () => checkJava(javaProbePath);
+        // Installed runtimes are size-checked against Eclipse's ready manifest
+        // before launch. Avoid starting a second JVM just to run `-version`.
+        handler.checkJava = skipJavaProbe
+          ? async () => fs.existsSync(javaProbePath) ? { run: true } : { run: false, message: 'The bundled Java runtime is missing.' }
+          : () => checkJava(javaProbePath);
       }
       if (strictDownloads && typeof handler?.downloadAsync === 'function') {
         const downloadAsync = handler.downloadAsync.bind(handler);
@@ -456,6 +502,7 @@ async function downloadMinecraftDependencies(event, folder, instancePath, metada
       meta: { type: 'legacy', demo: false }
     },
     root: instancePath,
+    overrides: { maxSockets: 12 },
     version: {
       number: metadata.version,
       type: metadata.versionType || 'release',
@@ -539,6 +586,90 @@ function copyMissingBundledFiles(source, destination) {
   }
 }
 
+function collectStartupArchiveInputs(instanceRoot, javaPath, classpath) {
+  const files = [];
+  const addFile = filePath => {
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile()) files.push(`${path.resolve(filePath)}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`);
+    } catch {}
+  };
+  for (const entry of classpath.split(path.delimiter)) addFile(entry);
+  addFile(javaPath);
+
+  const modsRoot = path.join(instanceRoot, 'mods');
+  const scanMods = (directory, depth = 0) => {
+    if (depth > 3) return;
+    let entries = [];
+    try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const filePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) scanMods(filePath, depth + 1);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.jar')) addFile(filePath);
+    }
+  };
+  scanMods(modsRoot);
+  return files.sort().join('\n');
+}
+
+function getStartupArchivePath(instanceRoot, javaPath, launchArguments, runtimeVersion, loader) {
+  // Forge's JVM argument setup can run without a loaded base CDS archive;
+  // Java then rejects DynamicDumpSharedSpaces from ArchiveClassesAtExit.
+  // Leave Forge on the normal JVM startup path while retaining AppCDS for
+  // Vanilla and Fabric, where the archive is supported.
+  if (String(loader || '').toLowerCase() === 'forge') return null;
+  const classpathIndex = launchArguments.findIndex(argument => argument === '-cp' || argument === '-classpath' || argument === '--class-path');
+  const classpath = classpathIndex >= 0 ? launchArguments[classpathIndex + 1] : '';
+  if (typeof classpath !== 'string' || !classpath) return null;
+  const runtimeMajor = Number(String(runtimeVersion || '').match(/^\d+/)?.[0]);
+  // Dynamic AppCDS is available from Java 13 onwards; older runtimes ignore it.
+  if (Number.isFinite(runtimeMajor) && runtimeMajor > 0 && runtimeMajor < 13) return null;
+  const inputs = collectStartupArchiveInputs(instanceRoot, javaPath, classpath);
+  const signature = crypto.createHash('sha256').update(`${javaPath}\0${runtimeVersion}\0${classpath}\0${inputs}`).digest('hex').slice(0, 24);
+  const archiveDirectory = path.join(app.getPath('userData'), 'startup-archives');
+  fs.mkdirSync(archiveDirectory, { recursive: true });
+  return path.join(archiveDirectory, `${path.basename(instanceRoot)}-${signature}.jsa`);
+}
+
+function getForgeJvmArguments(instanceRoot, profileId) {
+  if (!profileId) return [];
+  const profilePath = path.join(instanceRoot, 'versions', profileId, `${profileId}.json`);
+  let profile;
+  try { profile = JSON.parse(fs.readFileSync(profilePath, 'utf8')); }
+  catch (error) { throw new Error(`Could not read Forge launch profile: ${error.message}`); }
+  const source = Array.isArray(profile.arguments?.jvm) ? profile.arguments.jvm : [];
+  const osName = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'osx' : 'linux';
+  const libraryDirectory = path.join(instanceRoot, 'libraries');
+  const resolveArgument = value => String(value)
+    .replaceAll('${library_directory}', libraryDirectory)
+    .replaceAll('${classpath_separator}', path.delimiter)
+    .replaceAll('${version_name}', profileId);
+  const matchesRule = rule => {
+    if (rule.os?.name && rule.os.name !== osName) return false;
+    if (rule.os?.arch && rule.os.arch !== process.arch) return false;
+    if (rule.os?.version && !new RegExp(rule.os.version).test(os.release())) return false;
+    return true;
+  };
+  const output = [];
+  for (const entry of source) {
+    let values;
+    if (typeof entry === 'string') values = [entry];
+    else if (entry && typeof entry === 'object' && Array.isArray(entry.rules)) {
+      let allowed = false;
+      for (const rule of entry.rules) if (matchesRule(rule)) allowed = rule.action === 'allow';
+      if (!allowed) continue;
+      values = Array.isArray(entry.value) ? entry.value : [entry.value];
+    } else continue;
+    for (const value of values) {
+      if (typeof value !== 'string') continue;
+      const resolved = resolveArgument(value);
+      if (/\$\{[^}]+\}/.test(resolved)) throw new Error(`Forge launch profile contains an unsupported JVM argument: ${resolved}`);
+      output.push(resolved);
+    }
+  }
+  return output;
+}
+
 function updateInstanceMetadata(folder, update) {
   const metadataPath = path.join(instancesDir, folder, 'eclipse-instance.json');
   const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
@@ -588,13 +719,13 @@ function startInstancePlaytime(folder, onUpdate) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url, { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+  const response = await fetch(url, { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
   if (!response.ok) throw new Error(`Could not retrieve installation metadata (${response.status}): ${url}`);
   return response.json();
 }
 
 async function downloadFile(url, destination, onProgress) {
-  const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+  const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
   if (!response.ok || !response.body) throw new Error(`Download failed with HTTP ${response.status}.`);
   const total = Number(response.headers.get('content-length')) || 0;
   let received = 0;
@@ -610,7 +741,7 @@ async function downloadFile(url, destination, onProgress) {
 }
 
 const MODRINTH_API = 'https://api.modrinth.com/v2';
-const MODRINTH_USER_AGENT = 'thearmangaming1234-arch/StarEclipseLauncher/0.10.30';
+const MODRINTH_USER_AGENT = `thearmangaming1234-arch/StarEclipseLauncher/${LAUNCHER_VERSION}`;
 const MODRINTH_MAX_JAR_SIZE = 100 * 1024 * 1024;
 const MODRINTH_MAX_ASSET_SIZE = 1024 * 1024 * 1024;
 const MODRINTH_REGISTRY_NAME = '.eclipse-modrinth.json';
@@ -625,7 +756,11 @@ const ECLIPSE_CONFIG_ZIP_URL = 'https://github.com/thearmangaming1234-arch/StarE
 const ECLIPSE_ESSENTIALS_PACK_URL = 'https://github.com/thearmangaming1234-arch/StarEclipseLauncher/releases/download/Eclipse-Pack/ECLIPSE.Essentials.zip';
 const ECLIPSE_ESSENTIALS_PACK_FILE = 'ECLIPSE.Essentials.zip';
 const eclipseCustomizationOptionsCache = new Map();
-const TL_SKIN_ALLOWED_HOST = host => host === '9minecraft.net' || host.endsWith('.9minecraft.net') || host === 'cdn9mc.com' || host.endsWith('.cdn9mc.com');
+const TL_SKIN_ALLOWED_HOST = host => host === '9minecraft.net' || host.endsWith('.9minecraft.net')
+  || host === 'cdn9mc.com' || host.endsWith('.cdn9mc.com')
+  || host === '9sims4.com' || host.endsWith('.9sims4.com')
+  // The 9Minecraft endpoints redirect signed JARs to rotating 9sims4.com hosts.
+  || host === '9mcfiles.com' || host.endsWith('.9mcfiles.com');
 const PERFORMANCE_MODS = [
   { id: 'AANobbMI', slug: 'sodium', name: 'Sodium' },
   { id: 'PtjYWJkn', slug: 'sodium-extra', name: 'Sodium Extra' },
@@ -662,7 +797,19 @@ let cachedTLSkinModPage = null;
 let cachedTLSkinModPageAt = 0;
 let tlSkinModPageRequest = null;
 
-function getInstanceModContext(folder, requireInstalled = true) {
+function hasInstalledModToggleMarkers(instancePath, modsPath, metadata) {
+  if (!hasSafeRuntimeMetadata(metadata.runtimeComponent, metadata.runtimeVersion)) return false;
+  try {
+    const marker = fs.lstatSync(path.join(instancePath, 'downloaded.txt'));
+    const mods = fs.lstatSync(modsPath);
+    const runtimeReady = JSON.parse(fs.readFileSync(path.join(runtimeDirectory(metadata.runtimeComponent, metadata.runtimeVersion), '.eclipse-runtime-ready.json'), 'utf8'));
+    return marker.isFile() && !marker.isSymbolicLink() && mods.isDirectory() && !mods.isSymbolicLink() &&
+      runtimeReady.component === metadata.runtimeComponent && runtimeReady.version === metadata.runtimeVersion &&
+      Array.isArray(runtimeReady.files) && runtimeReady.files.length > 0;
+  } catch { return false; }
+}
+
+function getInstanceModContext(folder, requireInstalled = true, fastInstalledCheck = false) {
   if (typeof folder !== 'string' || path.basename(folder) !== folder) throw new Error('That Minecraft instance could not be found.');
   const instancePath = path.resolve(instancesDir, folder);
   if (path.dirname(instancePath) !== path.resolve(instancesDir)) throw new Error('That Minecraft instance path is invalid.');
@@ -679,7 +826,9 @@ function getInstanceModContext(folder, requireInstalled = true) {
   catch { throw new Error('The instance profile file is missing or invalid.'); }
   const release = getInstanceRelease(folder, metadata);
   if (!release) throw new Error('That Minecraft instance could not be found.');
-  const installed = isInstanceInstalled(folder, metadata);
+  const installed = fastInstalledCheck
+    ? hasInstalledModToggleMarkers(instancePath, path.join(instancePath, 'mods'), metadata)
+    : isInstanceInstalled(folder, metadata);
   if (requireInstalled && !installed) throw new Error('This instance is not installed. Install it from Home before managing mods.');
   const modsPath = path.join(instancePath, 'mods');
   if (installed) {
@@ -708,6 +857,22 @@ function normalizeModIdentity(value) {
     .replace(/\.jar(?:\.disabled)?$/i, '')
     .replace(/[^a-z0-9]/g, '')
     .replace(/[0-9].*$/, '');
+}
+
+function modFilenameMatchesProject(fileName, project) {
+  const stem = baseJarName(fileName).replace(/\.jar$/i, '');
+  const fileWords = stem.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  if (!fileWords.length) return false;
+  const aliases = [project?.slug, project?.title, project?.name]
+    .map(value => String(value || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+    .filter(words => words.length);
+  const loaderWords = new Set(['fabric', 'forge', 'neoforge', 'quilt', 'liteloader', 'mc', 'minecraft']);
+  return aliases.some(alias => {
+    if (alias.length > fileWords.length || !alias.every((word, index) => word === fileWords[index])) return false;
+    if (alias.length === fileWords.length) return true;
+    const nextWord = fileWords[alias.length];
+    return loaderWords.has(nextWord) || /^\d/.test(nextWord);
+  });
 }
 
 function ensureBuiltInModRecord(context) {
@@ -859,7 +1024,7 @@ async function listInstanceMods(folder, allowDuringInstall = false) {
   const registry = readModrinthRegistry(context.modsPath);
   const fileNames = listJarFiles(context.modsPath);
   let iconBytes = 0;
-  const mods = await mapConcurrent(fileNames, 12, async fileName => {
+  const mods = await mapConcurrent(fileNames, 4, async fileName => {
     const filePath = path.join(context.modsPath, fileName);
     try {
       const stat = fs.lstatSync(filePath);
@@ -879,6 +1044,7 @@ async function listInstanceMods(folder, allowDuringInstall = false) {
         id: String(embedded.id || managed.modId || '').slice(0, 160),
         name: String(embedded.name || managed.name || baseName.replace(/\.jar$/i, '').replace(/[-_]+/g, ' ')).slice(0, 160),
         version: String(embedded.version || managed.version || '').slice(0, 100),
+        modifiedAt: Number.isFinite(stat.mtimeMs) ? stat.mtimeMs : 0,
         description: String(embedded.description || managed.description || 'No description is available for this mod.').slice(0, 800),
         icon: icon.length <= 100_000 ? icon : '',
         builtIn: builtIns.has(baseName) || protectedBuiltIns.has(baseName),
@@ -922,7 +1088,9 @@ function assertModFolderIdle(folder) {
 
 async function setInstanceModEnabled(folder, fileName, enabled) {
   assertModFolderIdle(folder);
-  const context = getInstanceModContext(folder);
+  // The UI already has the mod inventory. A toggle only needs a safe in-place
+  // rename; don't revalidate every runtime file or reopen every mod archive.
+  const context = getInstanceModContext(folder, true, true);
   const expectedSuffix = enabled ? '.jar.disabled' : '.jar';
   if (typeof fileName !== 'string' || path.basename(fileName) !== fileName || !fileName.toLowerCase().endsWith(expectedSuffix)) throw new Error('That mod file could not be found.');
   if (Array.isArray(context.metadata.eclipseCustomizationBuiltInMods) && context.metadata.eclipseCustomizationBuiltInMods.includes(baseJarName(fileName))) throw new Error('Eclipse customization mods cannot be disabled.');
@@ -934,26 +1102,35 @@ async function setInstanceModEnabled(folder, fileName, enabled) {
   const destination = path.join(context.modsPath, destinationName);
   if (fs.existsSync(destination)) throw new Error('A mod with that filename already exists.');
   fs.renameSync(source, destination);
-  return listInstanceMods(folder);
+  return { folder, fileName: destinationName, enabled: Boolean(enabled) };
 }
 
 async function removeInstanceMod(folder, fileName) {
   assertModFolderIdle(folder);
-  const context = getInstanceModContext(folder);
+  // Removal only mutates one file. Skip the full runtime validation and mod
+  // archive metadata scan that are needed when refreshing the inventory.
+  const context = getInstanceModContext(folder, true, true);
   if (typeof fileName !== 'string' || path.basename(fileName) !== fileName || !/\.jar(?:\.disabled)?$/i.test(fileName)) throw new Error('That mod file could not be found.');
   if (Array.isArray(context.metadata.eclipseCustomizationBuiltInMods) && context.metadata.eclipseCustomizationBuiltInMods.includes(baseJarName(fileName))) throw new Error('Eclipse customization mods cannot be removed.');
   const target = path.resolve(context.modsPath, fileName);
   if (path.dirname(target) !== path.resolve(context.modsPath)) throw new Error('That mod file path is invalid.');
   const stat = fs.lstatSync(target);
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('That mod file is invalid.');
-  const builtIns = ensureBuiltInModRecord(context);
+  const baseName = baseJarName(fileName);
   fs.unlinkSync(target);
-  if (builtIns.has(baseJarName(fileName))) context.metadata.builtInMods = context.metadata.builtInMods.filter(name => name !== baseJarName(fileName));
-  fs.writeFileSync(path.join(context.instancePath, 'eclipse-instance.json'), JSON.stringify(context.metadata, null, 2), 'utf8');
+  const missingBuiltInRecord = !Array.isArray(context.metadata.builtInMods);
+  if (missingBuiltInRecord) context.metadata.builtInMods = listJarFiles(context.modsPath).map(baseJarName);
+  const updatedBuiltIns = context.metadata.builtInMods.filter(name => name !== baseName);
+  if (updatedBuiltIns.length !== context.metadata.builtInMods.length || missingBuiltInRecord) {
+    context.metadata.builtInMods = updatedBuiltIns;
+    fs.writeFileSync(path.join(context.instancePath, 'eclipse-instance.json'), JSON.stringify(context.metadata, null, 2), 'utf8');
+  }
   const registry = readModrinthRegistry(context.modsPath);
-  delete registry[baseJarName(fileName)];
-  writeModrinthRegistry(context.modsPath, registry);
-  return listInstanceMods(folder);
+  if (Object.prototype.hasOwnProperty.call(registry, baseName)) {
+    delete registry[baseName];
+    writeModrinthRegistry(context.modsPath, registry);
+  }
+  return { folder, fileName, removed: true };
 }
 
 function modrinthAssetType(value) {
@@ -1335,7 +1512,7 @@ async function getOptiFineDownloadsPage() {
   if (cachedOptiFineDownloadsPage && Date.now() - cachedOptiFineDownloadsPageAt < 10 * 60 * 1000) return cachedOptiFineDownloadsPage;
   if (optiFineDownloadsRequest) return optiFineDownloadsRequest;
   optiFineDownloadsRequest = (async () => {
-    const response = await fetch('https://optifine.net/downloads', { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+    const response = await fetch('https://optifine.net/downloads', { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
     if (!response.ok) throw new Error(`OptiFine version lookup failed with HTTP ${response.status}.`);
     const html = await response.text();
     cachedOptiFineDownloadsPage = html;
@@ -1378,10 +1555,10 @@ async function getTLSkinModPage() {
   if (cachedTLSkinModPage && Date.now() - cachedTLSkinModPageAt < 10 * 60 * 1000) return cachedTLSkinModPage;
   if (tlSkinModPageRequest) return tlSkinModPageRequest;
   tlSkinModPageRequest = (async () => {
-    const response = await fetch(TL_SKIN_MOD_PAGE, { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+    const response = await fetch(TL_SKIN_MOD_PAGE, { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
     if (!response.ok) throw new Error(`TL Skin & Cape version lookup failed with HTTP ${response.status}.`);
     const pageUrl = new URL(response.url);
-    if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'www.9minecraft.net') throw new Error('TL Skin & Cape redirected to an unexpected website.');
+    if (pageUrl.protocol !== 'https:' || pageUrl.hostname !== 'www.9minecraft.net') throw new Error(`TL Skin & Cape redirected to an unexpected website (${pageUrl.hostname}).`);
     cachedTLSkinModPage = await response.text();
     cachedTLSkinModPageAt = Date.now();
     return cachedTLSkinModPage;
@@ -1463,10 +1640,10 @@ async function downloadTLSkinMod(event, folder, instancePath, version, loader) {
   for (const downloadPageUrl of release.downloadPageUrls) {
     try {
       sendInstallProgress(event, folder, { phase: 'skin-mod', status: 'Opening the TL Skin & Cape download page', percent: null });
-      const landingResponse = await fetch(downloadPageUrl, { redirect: 'follow', headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+      const landingResponse = await fetch(downloadPageUrl, { redirect: 'follow', headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
       if (!landingResponse.ok) throw new Error(`The download page returned HTTP ${landingResponse.status}.`);
       const landingUrl = new URL(landingResponse.url);
-      if (landingUrl.protocol !== 'https:' || !TL_SKIN_ALLOWED_HOST(landingUrl.hostname)) throw new Error('The site redirected to an unexpected download page.');
+      if (landingUrl.protocol !== 'https:' || !TL_SKIN_ALLOWED_HOST(landingUrl.hostname)) throw new Error(`The site redirected to an unexpected download page (${landingUrl.hostname}).`);
       let downloadUrl;
       if (landingUrl.pathname === '/dl2.php' && landingUrl.searchParams.get('file') === release.filename) {
         const cookies = typeof landingResponse.headers.getSetCookie === 'function'
@@ -1496,11 +1673,18 @@ async function downloadTLSkinMod(event, folder, instancePath, version, loader) {
       sendInstallProgress(event, folder, { phase: 'skin-mod', status: 'Downloading TL Skin & Cape', percent: null });
       const response = await fetch(downloadUrl, {
         redirect: 'follow',
-        headers: { 'User-Agent': 'EclipseLauncher/0.10.30', ...(downloadUrl._cookieHeader ? { Cookie: downloadUrl._cookieHeader } : {}), Accept: 'application/java-archive, application/octet-stream' }
+        headers: { 'User-Agent': LAUNCHER_USER_AGENT, ...(downloadUrl._cookieHeader ? { Cookie: downloadUrl._cookieHeader } : {}), Accept: 'application/java-archive, application/octet-stream' }
       });
       if (!response.ok || !response.body) throw new Error(`The file request returned HTTP ${response.status}.`);
       const finalUrl = new URL(response.url);
-      if (finalUrl.protocol !== 'https:' || !TL_SKIN_ALLOWED_HOST(finalUrl.hostname)) throw new Error('The file redirected to an unexpected host.');
+      if (finalUrl.protocol !== 'https:' || !TL_SKIN_ALLOWED_HOST(finalUrl.hostname)) throw new Error(`The file redirected to an unexpected host (${finalUrl.hostname}).`);
+      if (finalUrl.hostname === '9sims4.com' || finalUrl.hostname.endsWith('.9sims4.com')) {
+        let finalFilename = '';
+        try { finalFilename = decodeURIComponent(finalUrl.pathname.split('/').pop() || ''); } catch {}
+        if (!/^\/9mc\//i.test(finalUrl.pathname) || finalFilename !== release.filename) {
+          throw new Error('The download host did not return the expected TL Skin & Cape file.');
+        }
+      }
       const maxBytes = 25 * 1024 * 1024;
       const contentLength = Number(response.headers.get('content-length')) || 0;
       if (contentLength > maxBytes) throw new Error('The file is larger than Eclipse allows.');
@@ -1624,12 +1808,17 @@ async function getEclipseCustomizationOptions(version, loader) {
 }
 
 async function downloadOptiFine(event, folder, instancePath, version, forgeBuild) {
+  const modsPath = path.join(instancePath, 'mods');
+  if (listJarFiles(modsPath).some(fileName => /optifine/i.test(fileName))) {
+    sendInstallProgress(event, folder, { phase: 'performance-mods', status: 'OptiFine is already present; skipping it', percent: 99 });
+    return { skipped: true };
+  }
   const release = await findOptiFineRelease(version);
   const forgeVersion = `${version}-${forgeBuild || ''}`;
   if (!optiFineCanBeAddedToForge(release, forgeVersion)) throw new Error(`OptiFine cannot be added to the Forge build selected for Minecraft ${version}.`);
   const startUrl = new URL(`/adloadx?f=${encodeURIComponent(release.filename)}`, 'https://optifine.net');
   sendInstallProgress(event, folder, { phase: 'performance-mods', status: 'Preparing the official OptiFine download', percent: 92 });
-  const landingResponse = await fetch(startUrl, { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+  const landingResponse = await fetch(startUrl, { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
   if (!landingResponse.ok) throw new Error(`OptiFine download page returned HTTP ${landingResponse.status}.`);
   const landingUrl = new URL(landingResponse.url);
   if (landingUrl.protocol !== 'https:' || landingUrl.hostname !== 'optifine.net') throw new Error('OptiFine redirected to an unexpected website.');
@@ -1641,7 +1830,7 @@ async function downloadOptiFine(event, folder, instancePath, version, forgeBuild
     throw new Error('OptiFine provided an unsafe download link.');
   }
   sendInstallProgress(event, folder, { phase: 'performance-mods', status: 'Downloading OptiFine from optifine.net', percent: null });
-  const response = await fetch(downloadUrl, { redirect: 'follow', headers: { 'User-Agent': 'EclipseLauncher/0.10.30', Accept: 'application/java-archive, application/octet-stream' } });
+  const response = await fetch(downloadUrl, { redirect: 'follow', headers: { 'User-Agent': LAUNCHER_USER_AGENT, Accept: 'application/java-archive, application/octet-stream' } });
   if (!response.ok || !response.body) throw new Error(`OptiFine download failed with HTTP ${response.status}.`);
   const finalUrl = new URL(response.url);
   if (finalUrl.protocol !== 'https:' || finalUrl.hostname !== 'optifine.net') throw new Error('OptiFine redirected to an unexpected website.');
@@ -1659,10 +1848,9 @@ async function downloadOptiFine(event, folder, instancePath, version, forgeBuild
   }
   const bytes = Buffer.concat(chunks);
   if (bytes.length < 4 || bytes.subarray(0, 4).toString('hex') !== '504b0304') throw new Error('The OptiFine download was not a valid JAR.');
-  const modsPath = path.join(instancePath, 'mods');
   fs.mkdirSync(modsPath, { recursive: true });
   const destination = path.join(modsPath, release.filename);
-  if (fs.existsSync(destination)) throw new Error('OptiFine is already present in this instance.');
+  if (fs.existsSync(destination)) return { skipped: true };
   fs.writeFileSync(destination, bytes, { flag: 'wx' });
   return release;
 }
@@ -1731,7 +1919,7 @@ async function findCompatibleModrinthAssetVersion(projectId, minecraftVersion) {
   return compatible.find(version => version.version_type === 'release') || compatible[0];
 }
 
-async function downloadModrinthAssetZip(file, destination, report) {
+async function downloadModrinthAssetZip(file, destination) {
   const maxBytes = Math.min(MODRINTH_MAX_ASSET_SIZE, Number.isFinite(file.size) && file.size > 0 ? file.size : MODRINTH_MAX_ASSET_SIZE);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 180000);
@@ -1750,7 +1938,6 @@ async function downloadModrinthAssetZip(file, destination, report) {
         received += chunk.length;
         if (received > maxBytes) return callback(new Error('This resource pack or shader pack is larger than Eclipse allows.'));
         hash.update(chunk);
-        report?.(received, Number(file.size) || contentLength || 0);
         callback(null, chunk);
       }
     });
@@ -1778,17 +1965,12 @@ async function installModrinthAsset(event, folder, projectId, assetType) {
   const staging = fs.mkdtempSync(path.join(app.getPath('temp'), 'eclipse-modrinth-asset-'));
   const stagedFile = path.join(staging, 'asset.zip');
   let createdDestination = '';
-  const sendProgress = update => {
-    if (!event.sender.isDestroyed()) event.sender.send('mods:install-progress', { folder, ...update });
-  };
   try {
-    sendProgress({ status: 'Checking asset compatibility', percent: 4 });
     const project = await modrinthJson(`${MODRINTH_API}/project/${encodeURIComponent(projectId)}`);
     const expectedType = selectedType === 'resourcepack' ? 'resourcepack' : 'shader';
     if (project.project_type !== expectedType) throw new Error('That Modrinth project is not the selected asset type.');
     const registry = readModrinthAssetRegistry(assetDirectory);
     if (Object.values(registry).some(asset => asset?.projectId === projectId)) {
-      sendProgress({ status: 'This asset is already installed', percent: 100, complete: true });
       return { folder, assetType: selectedType, installedCount: 0 };
     }
     const minecraftVersion = String(context.metadata.version || context.release.version || '');
@@ -1801,11 +1983,7 @@ async function installModrinthAsset(event, folder, projectId, assetType) {
       filename = `${stem}-${String(version.id || '').slice(0, 6)}.zip`;
       if (fs.existsSync(path.join(assetDirectory, filename))) throw new Error(`An asset named ${filename} already exists.`);
     }
-    sendProgress({ status: `Downloading ${project.title || (selectedType === 'resourcepack' ? 'resource pack' : 'shader pack')}`, percent: 8 });
-    await downloadModrinthAssetZip(file, stagedFile, (received, total) => {
-      const percent = total ? Math.min(92, Math.round(8 + received / total * 84)) : null;
-      sendProgress({ status: `Downloading ${project.title || 'Modrinth asset'}`, percent });
-    });
+    await downloadModrinthAssetZip(file, stagedFile);
     const destination = path.resolve(assetDirectory, filename);
     if (path.dirname(destination) !== path.resolve(assetDirectory)) throw new Error('The asset filename is unsafe.');
     fs.copyFileSync(stagedFile, destination, fs.constants.COPYFILE_EXCL);
@@ -1820,11 +1998,9 @@ async function installModrinthAsset(event, folder, projectId, assetType) {
       versionId: String(version.id || '')
     };
     writeModrinthAssetRegistry(assetDirectory, registry);
-    sendProgress({ status: `${selectedType === 'resourcepack' ? 'Resource pack' : 'Shader pack'} installed`, percent: 100, complete: true });
     return { folder, assetType: selectedType, installedCount: 1, fileName: filename };
   } catch (error) {
     if (createdDestination) fs.rmSync(createdDestination, { force: true });
-    sendProgress({ status: error.message || 'Asset installation failed', percent: null, error: true });
     throw error;
   } finally {
     activeModInstalls.delete(folder);
@@ -1842,54 +2018,102 @@ async function installModrinthProject(event, folder, projectId, duringInstanceIn
       throw new Error('The instance is not ready to install its selected performance mods.');
     }
   } else assertModFolderIdle(folder);
-  const context = getInstanceModContext(folder, !duringInstanceInstall);
-  const staging = fs.mkdtempSync(path.join(app.getPath('temp'), 'eclipse-modrinth-'));
+  const context = getInstanceModContext(folder, !duringInstanceInstall, true);
+  // Keep staged JARs on the destination volume so installing a validated file
+  // is an atomic rename instead of a second full-size disk copy.
+  fs.mkdirSync(context.modsPath, { recursive: true });
+  const staging = fs.mkdtempSync(path.join(context.modsPath, '.eclipse-modrinth-'));
   activeModInstalls.add(folder);
   const createdModFiles = [];
   const sendProgress = update => {
-    if (!event.sender.isDestroyed()) event.sender.send('mods:install-progress', { folder, ...update });
-    if (duringInstanceInstall) sendInstallProgress(event, folder, {
+    if (!duringInstanceInstall) return;
+    // Automatic installs belong to the instance-install flow. Sending the
+    // same completion event to the Mods page leaves its manual-install panel
+    // visible after background setup has finished.
+    sendInstallProgress(event, folder, {
       phase: 'performance-mods',
       status: update.status || 'Installing performance mods',
       percent: update.percent == null ? null : Math.round(92 + update.percent * 0.07)
     });
   };
   try {
-    const current = context.installed || duringInstanceInstall ? await listInstanceMods(folder, true) : { mods: [] };
-    // listInstanceMods returns inventory metadata as an object; its `mods`
-    // member is the actual array. Calling map on the wrapper breaks every install.
-    const currentMods = Array.isArray(current.mods) ? current.mods : [];
-    const existingProjects = new Set(currentMods.map(mod => mod.modrinthProjectId).filter(Boolean));
-    const existingModIds = new Set(currentMods.flatMap(mod => [mod.id, mod.name, mod.baseName]).map(normalizeModIdentity).filter(Boolean));
     const registry = readModrinthRegistry(context.modsPath);
+    // Modrinth's registry and JAR filenames are enough to detect installed
+    // projects; opening every JAR to parse metadata makes each install slower.
+    const existingProjects = new Set(Object.values(registry).map(mod => mod?.projectId).filter(Boolean));
+    const existingModFiles = listJarFiles(context.modsPath);
+    const existingModIds = new Set(existingModFiles.map(fileName => normalizeModIdentity(baseJarName(fileName))).filter(Boolean));
     const projectCache = new Map();
-    const getProject = async id => {
-      if (!projectCache.has(id)) projectCache.set(id, await modrinthJson(`${MODRINTH_API}/project/${encodeURIComponent(id)}`));
+    const versionCache = new Map();
+    const dependencyVersionCache = new Map();
+    const getProject = id => {
+      if (!projectCache.has(id)) projectCache.set(id, modrinthJson(`${MODRINTH_API}/project/${encodeURIComponent(id)}`));
       return projectCache.get(id);
     };
     const isInstalled = async id => {
       if (existingProjects.has(id)) return true;
       const project = await getProject(id);
-      return existingModIds.has(normalizeModIdentity(project.slug)) || existingModIds.has(normalizeModIdentity(project.title));
+      const projectSlug = normalizeModIdentity(project.slug);
+      const projectTitle = normalizeModIdentity(project.title);
+      return existingModIds.has(projectSlug) || existingModIds.has(projectTitle)
+        || existingModFiles.some(fileName => modFilenameMatchesProject(fileName, project));
     };
-    const visiting = new Set();
-    const scheduled = new Set();
+    const getVersion = (id, versionId = '') => {
+      const key = `${id}:${versionId}`;
+      if (!versionCache.has(key)) versionCache.set(key, findCompatibleModrinthVersion(id, context, versionId));
+      return versionCache.get(key);
+    };
+    const visitPromises = new Map();
+    const requestedVersions = new Map();
     const resolved = [];
-    const visit = async (id, label, versionId = '') => {
-      if (scheduled.has(id)) return;
-      if (visiting.has(id)) return;
-      visiting.add(id);
+    const visit = (id, label, versionId = '', ancestry = new Set()) => {
+      if (ancestry.has(id)) return Promise.resolve();
+      if (visitPromises.has(id)) {
+        const requested = requestedVersions.get(id);
+        if (versionId !== requested && (versionId || requested)) {
+          const error = new Error(`The required dependency graph requests conflicting versions of ${label}.`);
+          error.code = 'MODRINTH_INCOMPATIBLE';
+          return Promise.reject(error);
+        }
+        return visitPromises.get(id);
+      }
+      requestedVersions.set(id, versionId);
+      const nextAncestry = new Set(ancestry);
+      nextAncestry.add(id);
+      const work = (async () => {
       const installedRecord = Object.values(registry).find(mod => mod?.projectId === id);
       const installed = await isInstalled(id);
-      const version = await findCompatibleModrinthVersion(id, context, versionId || (installed ? installedRecord?.versionId || '' : ''));
-      for (const dependency of version.dependencies || []) {
-        if (dependency.dependency_type !== 'required') continue;
-        const dependencyId = dependency.project_id || (dependency.version_id ? (await modrinthJson(`${MODRINTH_API}/version/${encodeURIComponent(dependency.version_id)}`)).project_id : '');
+      if (installed && versionId && installedRecord?.versionId && installedRecord.versionId !== versionId) {
+        const error = new Error(`${label} requires a different version than the one already installed.`);
+        error.code = 'MODRINTH_INCOMPATIBLE';
+        throw error;
+      }
+      const version = await getVersion(id, versionId || (installed ? installedRecord?.versionId || '' : ''));
+      const requiredDependencies = await Promise.all((version.dependencies || [])
+        .filter(dependency => dependency.dependency_type === 'required')
+        .map(async dependency => {
+          let versionInfo = null;
+          if (dependency.version_id) {
+            if (!dependencyVersionCache.has(dependency.version_id)) {
+              dependencyVersionCache.set(dependency.version_id, modrinthJson(`${MODRINTH_API}/version/${encodeURIComponent(dependency.version_id)}`));
+            }
+            versionInfo = await dependencyVersionCache.get(dependency.version_id);
+          }
+          const dependencyId = dependency.project_id || versionInfo?.project_id || '';
+          if (!dependencyId) throw new Error(`${label} has a required external dependency that Eclipse cannot resolve automatically.`);
+          const project = await getProject(dependencyId);
+          return {
+            id: dependencyId,
+            name: project.title || project.name || project.slug || 'Required dependency',
+            versionId: dependency.version_id || ''
+          };
+        }));
+      await Promise.all(requiredDependencies.map(async dependency => {
+        const dependencyId = dependency.id;
+        const dependencyName = dependency.name;
         if (!dependencyId) throw new Error(`${label} has a required external dependency that Eclipse cannot resolve automatically.`);
-        const project = await getProject(dependencyId);
-        const dependencyName = project.title || project.name || project.slug || 'Required dependency';
         try {
-          await visit(dependencyId, dependencyName, dependency.version_id || '');
+          await visit(dependencyId, dependencyName, dependency.versionId, nextAncestry);
         } catch (error) {
           if (error.code === 'MODRINTH_INCOMPATIBLE') {
             const compatibilityError = new Error(`${label} requires ${dependencyName}, which does not support this ${context.metadata.loader} instance and Minecraft ${context.metadata.version || context.release.version}.`);
@@ -1898,38 +2122,63 @@ async function installModrinthProject(event, folder, projectId, duringInstanceIn
           }
           throw error;
         }
-      }
+      }));
       const project = await getProject(id);
       if (!installed) {
         const file = chooseModrinthJar(version);
         resolved.push({ projectId: id, slug: String(project.slug || ''), name: String(project.title || label), description: String(project.description || ''), icon: secureModrinthIcon(project.icon_url), versionId: version.id, version: version.version_number, file });
       }
-      scheduled.add(id);
-      visiting.delete(id);
+      })();
+      visitPromises.set(id, work);
+      return work;
     };
     sendProgress({ status: 'Checking compatible versions and dependencies', percent: 4 });
-    for (const id of projectIds) {
+    await Promise.all(projectIds.map(async id => {
       const project = await getProject(id);
-      await visit(id, project.title || project.name || project.slug || 'Performance mod');
-    }
+      await visit(id, project.title || project.name || project.slug || 'Mod');
+    }));
     if (!resolved.length) {
       sendProgress({ status: 'The mod and its required dependencies are already installed', percent: 100, complete: true });
-      return { ...(await listInstanceMods(folder, true)), installedCount: 0 };
+      return { folder, installed: true, installedCount: 0, mods: [] };
     }
 
-    const staged = [];
-    for (let index = 0; index < resolved.length; index++) {
-      const item = resolved[index];
-      const filename = path.basename(item.file.filename).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '');
-      if (!filename.toLowerCase().endsWith('.jar')) throw new Error('Modrinth returned a file that is not a JAR.');
-      const stagedPath = path.join(staging, `${index}.jar`);
-      sendProgress({ status: `Downloading ${item.name}`, percent: Math.round(8 + 84 * index / resolved.length) });
-      await downloadModrinthJar(item.file, stagedPath, (received, total) => {
-        const downloadPart = total ? Math.round(84 * (index + received / total) / resolved.length) : 0;
-        sendProgress({ status: `Downloading ${item.name}`, percent: Math.min(92, 8 + downloadPart) });
-      });
-      staged.push({ ...item, filename, stagedPath });
-    }
+    const staged = new Array(resolved.length);
+    const expectedBytes = resolved.reduce((total, item) => total + (Number(item.file.size) || 0), 0);
+    const receivedByFile = new Array(resolved.length).fill(0);
+    let receivedBytes = 0;
+    let completedDownloads = 0;
+    let nextDownload = 0;
+    let firstDownloadError = null;
+    const downloadWorker = async () => {
+      while (!firstDownloadError) {
+        const index = nextDownload++;
+        if (index >= resolved.length) return;
+        const item = resolved[index];
+        const filename = path.basename(item.file.filename).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '');
+        if (!filename.toLowerCase().endsWith('.jar')) {
+          firstDownloadError = new Error('Modrinth returned a file that is not a JAR.');
+          return;
+        }
+        const stagedPath = path.join(staging, `${index}.jar`);
+        if (duringInstanceInstall) sendProgress({ status: `Downloading ${item.name}`, percent: Math.round(8 + 84 * (expectedBytes ? receivedBytes / expectedBytes : completedDownloads / resolved.length)) });
+        try {
+          const onDownloadProgress = duringInstanceInstall ? received => {
+            const current = Math.max(receivedByFile[index], Number(received) || 0);
+            receivedBytes += current - receivedByFile[index];
+            receivedByFile[index] = current;
+            const fraction = expectedBytes ? receivedBytes / expectedBytes : completedDownloads / resolved.length;
+            sendProgress({ status: `Downloading ${item.name}`, percent: Math.min(92, Math.round(8 + 84 * fraction)) });
+          } : undefined;
+          await downloadModrinthJar(item.file, stagedPath, onDownloadProgress);
+          completedDownloads++;
+          staged[index] = { ...item, filename, stagedPath };
+        } catch (error) {
+          firstDownloadError ||= error;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, resolved.length) }, downloadWorker));
+    if (firstDownloadError) throw firstDownloadError;
 
     const newNames = new Set();
     for (const item of staged) {
@@ -1946,13 +2195,32 @@ async function installModrinthProject(event, folder, projectId, duringInstanceIn
     for (const item of staged) {
       const destination = path.resolve(context.modsPath, item.filename);
       if (path.dirname(destination) !== path.resolve(context.modsPath)) throw new Error('A mod download contained an unsafe filename.');
-      fs.copyFileSync(item.stagedPath, destination, fs.constants.COPYFILE_EXCL);
+      fs.renameSync(item.stagedPath, destination);
       createdModFiles.push(destination);
       registry[item.filename] = { projectId: item.projectId, slug: item.slug, name: item.name, description: item.description, icon: item.icon, modId: '', version: item.version, versionId: item.versionId };
     }
     writeModrinthRegistry(context.modsPath, registry);
     sendProgress({ status: `Installed ${resolved.length} mod${resolved.length === 1 ? '' : 's'} with required dependencies`, percent: 100, complete: true });
-    return { ...(await listInstanceMods(folder, true)), installedCount: staged.length };
+    return {
+      folder,
+      installed: true,
+      installedCount: staged.length,
+      mods: staged.map(item => ({
+        fileName: item.filename,
+        baseName: item.filename,
+        id: item.slug,
+        name: item.name,
+        version: item.version,
+        description: item.description || 'No description is available for this mod.',
+        icon: item.icon,
+        builtIn: false,
+        protectedBuiltIn: false,
+        enabled: true,
+        modrinthProjectId: item.projectId,
+        modrinthSlug: item.slug,
+        modifiedAt: Date.now()
+      }))
+    };
   } catch (error) {
     for (const filePath of createdModFiles) fs.rmSync(filePath, { force: true });
     sendProgress({ status: error.message || 'Mod installation failed', percent: null, error: true });
@@ -1993,7 +2261,30 @@ async function installPerformanceMods(event, folder, instancePath, metadata) {
         });
       }
     }
-    if (installableProjects.length) await installModrinthProject(event, folder, installableProjects, true);
+    if (installableProjects.length) {
+      try {
+        await installModrinthProject(event, folder, installableProjects, true);
+      } catch (error) {
+        if (error.code !== 'MODRINTH_INCOMPATIBLE') throw error;
+        // Selected performance mods are optional. If two projects require
+        // different versions of a shared dependency (commonly Sodium), retry
+        // them independently so compatible selections still install and the
+        // base game instance remains usable.
+        for (const id of installableProjects) {
+          try {
+            await installModrinthProject(event, folder, id, true);
+          } catch (modError) {
+            if (modError.code !== 'MODRINTH_INCOMPATIBLE') throw modError;
+            const selectedMod = [...PERFORMANCE_MODS, ...UTILITY_MODS].find(mod => mod.id === id);
+            sendInstallProgress(event, folder, {
+              phase: 'performance-mods',
+              status: `Skipping ${selectedMod?.name || id}: ${modError.message}`,
+              percent: 93
+            });
+          }
+        }
+      }
+    }
   }
   if (loader === 'forge' && metadata.addOptiFine === true) {
     await downloadOptiFine(event, folder, instancePath, metadata.version, metadata.loaderVersion);
@@ -2006,7 +2297,7 @@ async function downloadEclipseReleaseAsset(url, destination, maxBytes, onProgres
   if (source.protocol !== 'https:' || source.hostname !== 'github.com' || !source.pathname.startsWith('/thearmangaming1234-arch/StarEclipseLauncher/releases/download/')) {
     throw new Error('The Eclipse customization download URL is invalid.');
   }
-  const response = await fetch(source, { redirect: 'follow', headers: { 'User-Agent': 'EclipseLauncher/0.10.30', Accept: 'application/octet-stream' } });
+  const response = await fetch(source, { redirect: 'follow', headers: { 'User-Agent': LAUNCHER_USER_AGENT, Accept: 'application/octet-stream' } });
   const finalUrl = new URL(response.url || source.href);
   if (!response.ok || !response.body) throw new Error(`Eclipse customization download failed with HTTP ${response.status}.`);
   if (finalUrl.protocol !== 'https:' || !(finalUrl.hostname === 'github.com' || finalUrl.hostname.endsWith('.githubusercontent.com'))) {
@@ -2130,15 +2421,19 @@ async function installEclipseCustomization(event, folder, instancePath, metadata
     const compatibility = await getEclipseCustomizationOptions(metadata.version, loader);
     availableMods = compatibility.filter(mod => mod.available);
     if (availableMods.length) {
-      await installModrinthProject(event, folder, availableMods.map(mod => mod.id), true);
       const staging = fs.mkdtempSync(path.join(app.getPath('temp'), 'eclipse-customization-config-'));
       const archive = path.join(staging, 'config.zip');
       const extracted = path.join(staging, 'extracted');
       try {
         sendInstallProgress(event, folder, { phase: 'eclipse-customization', status: 'Downloading Eclipse menu and Discord configuration', percent: null });
-        await downloadEclipseReleaseAsset(ECLIPSE_CONFIG_ZIP_URL, archive, 16 * 1024 * 1024, (received, total) => {
+        const downloads = await Promise.allSettled([
+          installModrinthProject(event, folder, availableMods.map(mod => mod.id), true),
+          downloadEclipseReleaseAsset(ECLIPSE_CONFIG_ZIP_URL, archive, 16 * 1024 * 1024, (received, total) => {
           sendInstallProgress(event, folder, { phase: 'eclipse-customization', status: 'Downloading Eclipse menu and Discord configuration', percent: total ? Math.min(99, Math.round(received / total * 100)) : null });
-        });
+          })
+        ]);
+        const failedDownload = downloads.find(result => result.status === 'rejected');
+        if (failedDownload) throw failedDownload.reason;
         let uncompressedBytes = 0;
         await extractZip(archive, {
           dir: extracted,
@@ -2223,7 +2518,7 @@ async function installJavaRuntime(component, progress) {
       progress({ phase: 'runtime', status: `Setting up Java ${manifestInfo.version.name}`, percent: Math.round((completed / files.length) * 100) });
     }
   };
-  await Promise.all(Array.from({ length: Math.min(6, tasks.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(8, tasks.length) }, worker));
   if (!fs.existsSync(javaPath)) throw new Error('Java runtime installation did not produce its launcher executable.');
   fs.writeFileSync(path.join(basePath, '.eclipse-runtime-ready.json'), JSON.stringify({
     component,
@@ -2233,9 +2528,28 @@ async function installJavaRuntime(component, progress) {
   return { javaPath, runtimeVersion: manifestInfo.version.name };
 }
 
+const MINECRAFT_VERSION_MANIFEST_URLS = [
+  'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json',
+  'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json'
+];
+
+async function getMinecraftVersionManifest() {
+  let lastError = null;
+  for (const url of MINECRAFT_VERSION_MANIFEST_URLS) {
+    try {
+      const manifest = await fetchJson(url);
+      if (!Array.isArray(manifest.versions)) throw new Error('Mojang returned an invalid Minecraft version manifest.');
+      return manifest;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`Could not reach Mojang’s Minecraft version service. Check your internet or DNS connection and try again. ${lastError?.message || ''}`.trim());
+}
+
 async function resolveMinecraftVersion(version) {
   if (typeof version !== 'string' || !/^\d+\.\d+(?:\.\d+)?(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) throw new Error('Enter a valid Minecraft version number.');
-  const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
+  const manifest = await getMinecraftVersionManifest();
   const entry = manifest.versions?.find(item => item.id === version);
   if (!entry) throw new Error(`Minecraft ${version} is not in Mojang’s version manifest.`);
   const details = await fetchJson(entry.url);
@@ -2245,7 +2559,7 @@ async function resolveMinecraftVersion(version) {
 }
 
 async function getForgeBuildForMinecraft(version, requiredBuild = '') {
-  const response = await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml', { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+  const response = await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml', { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
   if (!response.ok) throw new Error(`Forge version lookup failed with HTTP ${response.status}.`);
   const metadataXml = await response.text();
   const matching = [...metadataXml.matchAll(/<version>([^<]+)<\/version>/g)].map(match => match[1]).filter(item => item.startsWith(`${version}-`));
@@ -2326,12 +2640,27 @@ async function installCustomInstance(event, folder) {
   try {
     const { entry, details, majorVersion, runtimeComponent } = await resolveMinecraftVersion(metadata.version);
     sendInstallProgress(event, folder, { phase: 'runtime', status: 'Setting up the required Java runtime', percent: 0 });
-    const runtime = await installJavaRuntime(runtimeComponent, update => sendInstallProgress(event, folder, update));
     for (const directory of ['mods', 'config', 'resourcepacks', 'shaderpacks', 'saves', 'versions']) fs.mkdirSync(path.join(instancePath, directory), { recursive: true });
-    const loaderInfo = await prepareCustomLoader(instancePath, metadata.version, String(metadata.loader || 'Vanilla').toLowerCase(), Object.assign(
+    const selectedLoader = String(metadata.loader || 'Vanilla').toLowerCase();
+    const prepareLoader = runtime => prepareCustomLoader(instancePath, metadata.version, selectedLoader, Object.assign(
       update => sendInstallProgress(event, folder, update),
-      { runtimeJavaPath: runtime.javaPath, runtimeComponent, runtimeVersion: runtime.runtimeVersion, preferredForgeVersion: metadata.addOptiFine ? metadata.optifineForgeVersion : '' }
+      { runtimeJavaPath: runtime?.javaPath, runtimeComponent, runtimeVersion: runtime?.runtimeVersion, preferredForgeVersion: metadata.addOptiFine ? metadata.optifineForgeVersion : '' }
     ));
+    let runtime;
+    let loaderInfo;
+    if (selectedLoader === 'forge') {
+      runtime = await installJavaRuntime(runtimeComponent, update => sendInstallProgress(event, folder, update));
+      loaderInfo = await prepareLoader(runtime);
+    } else {
+      const [runtimeResult, loaderResult] = await Promise.allSettled([
+        installJavaRuntime(runtimeComponent, update => sendInstallProgress(event, folder, update)),
+        prepareLoader(null)
+      ]);
+      if (runtimeResult.status === 'rejected') throw runtimeResult.reason;
+      if (loaderResult.status === 'rejected') throw loaderResult.reason;
+      runtime = runtimeResult.value;
+      loaderInfo = loaderResult.value;
+    }
     const updated = {
       ...metadata,
       loader: String(metadata.loader || 'Vanilla').replace(/^./, letter => letter.toUpperCase()),
@@ -2347,8 +2676,12 @@ async function installCustomInstance(event, folder) {
     fs.writeFileSync(path.join(instancePath, 'eclipse-instance.json'), JSON.stringify(updated, null, 2));
     const marker = path.join(instancePath, 'downloaded.txt');
     fs.rmSync(marker, { force: true });
-    await downloadMinecraftDependencies(event, folder, instancePath, updated);
-    await installPerformanceMods(event, folder, instancePath, updated);
+    const setupResults = await Promise.allSettled([
+      downloadMinecraftDependencies(event, folder, instancePath, updated),
+      installPerformanceMods(event, folder, instancePath, updated)
+    ]);
+    const setupFailure = setupResults.find(result => result.status === 'rejected');
+    if (setupFailure) throw setupFailure.reason;
     await installEclipseCustomization(event, folder, instancePath, updated);
     fs.writeFileSync(marker, 'Custom instance runtime and loader installed by Eclipse Launcher.\n');
     if (!isInstanceInstalled(folder, updated)) {
@@ -2376,6 +2709,12 @@ async function installInstance(event, folder) {
   const archive = path.join(staging, 'instance.zip');
   const extracted = path.join(staging, 'extracted');
   activeInstanceInstalls.add(folder);
+  const runtimeComponent = release.version === '26.2' ? 'java-runtime-epsilon' : 'java-runtime-gamma';
+  sendInstallProgress(event, folder, { phase: 'runtime', status: 'Setting up the required Java runtime', percent: 0 });
+  const runtimeTask = installJavaRuntime(runtimeComponent, update => sendInstallProgress(event, folder, update))
+    .then(runtime => ({ runtime }), error => ({ error }));
+  const fabricProfileTask = fetchJson(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(release.version)}/${encodeURIComponent(release.fabricLoader)}/profile/json`)
+    .then(fabricProfile => ({ fabricProfile }), error => ({ error }));
   try {
     sendInstallProgress(event, folder, { phase: 'download', status: 'Downloading instance files', percent: 0 });
     await downloadFile(release.url, archive, (received, total) => {
@@ -2403,7 +2742,9 @@ async function installInstance(event, folder) {
     }
 
     sendInstallProgress(event, folder, { phase: 'fabric', status: 'Preparing Fabric profile', percent: null });
-    const fabricProfile = await fetchJson(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(release.version)}/${encodeURIComponent(release.fabricLoader)}/profile/json`);
+    const fabricProfileResult = await fabricProfileTask;
+    if (fabricProfileResult.error) throw fabricProfileResult.error;
+    const fabricProfile = fabricProfileResult.fabricProfile;
     if (fabricProfile.id !== release.launchProfile || fabricProfile.inheritsFrom !== release.version || !Array.isArray(fabricProfile.libraries)) {
       throw new Error('Fabric returned an unexpected launch profile.');
     }
@@ -2411,9 +2752,9 @@ async function installInstance(event, folder) {
     fs.mkdirSync(profileDir, { recursive: true });
     fs.writeFileSync(path.join(profileDir, `${release.launchProfile}.json`), JSON.stringify(fabricProfile, null, 2), 'utf8');
 
-    sendInstallProgress(event, folder, { phase: 'runtime', status: 'Setting up the required Java runtime', percent: 0 });
-    const runtimeComponent = release.version === '26.2' ? 'java-runtime-epsilon' : 'java-runtime-gamma';
-    const runtime = await installJavaRuntime(runtimeComponent, update => sendInstallProgress(event, folder, update));
+    const runtimeResult = await runtimeTask;
+    if (runtimeResult.error) throw runtimeResult.error;
+    const runtime = runtimeResult.runtime;
 
     sendInstallProgress(event, folder, { phase: 'finalize', status: 'Finishing instance setup', percent: null });
     await fs.promises.cp(extracted, instancePath, {
@@ -2430,8 +2771,12 @@ async function installInstance(event, folder) {
     fs.writeFileSync(metadataPath, JSON.stringify(installedMetadata, null, 2));
     const markerPath = path.join(instancePath, 'downloaded.txt');
     fs.rmSync(markerPath, { force: true });
-    await downloadMinecraftDependencies(event, folder, instancePath, installedMetadata);
-    await ensureEclipseEssentialsPack(event, folder, instancePath, installedMetadata);
+    const setupResults = await Promise.allSettled([
+      downloadMinecraftDependencies(event, folder, instancePath, installedMetadata),
+      ensureEclipseEssentialsPack(event, folder, instancePath, installedMetadata)
+    ]);
+    const setupFailure = setupResults.find(result => result.status === 'rejected');
+    if (setupFailure) throw setupFailure.reason;
     fs.writeFileSync(markerPath, 'Installed and verified by Eclipse Launcher.\n', 'utf8');
     if (!isInstanceInstalled(folder, installedMetadata)) {
       fs.rmSync(markerPath, { force: true });
@@ -2443,14 +2788,337 @@ async function installInstance(event, folder) {
     sendInstallProgress(event, folder, { phase: 'error', status: error.message || 'Installation failed', percent: null });
     throw error;
   } finally {
+    await Promise.all([runtimeTask, fabricProfileTask]);
     activeInstanceInstalls.delete(folder);
     fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+function readJsonIfPresent(filePath) {
+  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch { return null; }
+}
+
+async function detectModLoaderFromJars(gameRoot) {
+  const modsPath = path.join(gameRoot, 'mods');
+  let jars = [];
+  try { jars = fs.readdirSync(modsPath, { withFileTypes: true }).filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.jar')).map(entry => path.join(modsPath, entry.name)); } catch {}
+  // Loader metadata is present in the majority of mods. Bound the scan so a
+  // large custom mods folder cannot make importing feel unresponsive.
+  for (const jarPath of jars.slice(0, 40)) {
+    const detected = await new Promise(resolve => {
+      yauzl.open(jarPath, { lazyEntries: true, autoClose: true }, (error, zip) => {
+        if (error || !zip) return resolve('');
+        let finished = false;
+        const finish = value => { if (finished) return; finished = true; resolve(value); };
+        zip.on('error', () => finish(''));
+        zip.on('entry', entry => {
+          const name = entry.fileName.replace(/\\/g, '/').toLowerCase();
+          if (name === 'fabric.mod.json') return finish('fabric');
+          if (name === 'meta-inf/mods.toml' || name === 'meta-inf/neoforge.mods.toml') return finish('forge');
+          zip.readEntry();
+        });
+        zip.on('end', () => finish(''));
+        zip.readEntry();
+      });
+    });
+    if (detected) return detected;
+  }
+  return '';
+}
+
+async function inspectImportedModpack(folderPath) {
+  let gameRoot = folderPath;
+  if (!fs.existsSync(path.join(gameRoot, 'versions'))) {
+    for (const nested of ['.minecraft', 'minecraft', 'game']) {
+      const candidate = path.join(folderPath, nested);
+      if (fs.existsSync(path.join(candidate, 'versions')) || fs.existsSync(path.join(candidate, 'mods'))) { gameRoot = candidate; break; }
+    }
+  }
+  const existingMetadata = readJsonIfPresent(path.join(gameRoot, 'eclipse-instance.json')) || {};
+  let version = String(existingMetadata.version || '');
+  let loader = String(existingMetadata.loader || '').toLowerCase();
+  let launchProfile = String(existingMetadata.launchProfile || '');
+  let versionType = String(existingMetadata.versionType || '');
+  const candidates = [];
+  const versionsPath = path.join(gameRoot, 'versions');
+  try {
+    for (const entry of fs.readdirSync(versionsPath, { withFileTypes: true })) {
+      if (!entry.isDirectory() || path.basename(entry.name) !== entry.name) continue;
+      const profile = readJsonIfPresent(path.join(versionsPath, entry.name, `${entry.name}.json`));
+      if (!profile) continue;
+      const inheritedVersion = String(profile.inheritsFrom || profile.id || entry.name);
+      const candidateVersion = String(profile.inheritsFrom || (profile.id === entry.name ? profile.id : ''));
+      if (!/^\d+\.\d+(?:\.\d+)?$/.test(candidateVersion)) continue;
+      const profileId = String(profile.id || entry.name);
+      const detectedLoader = /fabric/i.test(profileId) || /net\.fabricmc\.loader/i.test(profile.mainClass || '') ? 'fabric'
+        : /neoforge/i.test(profileId) || /neoforge/i.test(profile.mainClass || '') ? 'neoforge'
+          : /forge/i.test(profileId) || /modlauncher/i.test(profile.mainClass || '') ? 'forge' : 'vanilla';
+      candidates.push({ profileId, version: candidateVersion || inheritedVersion, loader: detectedLoader, versionType: profile.type || versionType, hasParent: Boolean(profile.inheritsFrom) });
+    }
+  } catch {}
+
+  const mmcPack = readJsonIfPresent(path.join(gameRoot, 'mmc-pack.json'));
+  if (mmcPack && Array.isArray(mmcPack.components)) {
+    const game = mmcPack.components.find(item => item.uid === 'net.minecraft');
+    if (!version && game?.version) version = String(game.version);
+    const fabric = mmcPack.components.find(item => /fabric-loader/i.test(item.uid || ''));
+    const neoForge = mmcPack.components.find(item => /neoforge/i.test(item.uid || ''));
+    const forge = mmcPack.components.find(item => /forge/i.test(item.uid || ''));
+    if (!loader || loader === 'unknown') loader = fabric ? 'fabric' : neoForge ? 'neoforge' : forge ? 'forge' : 'vanilla';
+  }
+  const manifest = readJsonIfPresent(path.join(gameRoot, 'manifest.json'));
+  if (manifest?.minecraft?.version) {
+    if (!version) version = String(manifest.minecraft.version);
+    const modLoader = manifest.minecraft.modLoaders?.find(item => item.primary)?.id || manifest.minecraft.modLoaders?.[0]?.id || '';
+    if (!loader || loader === 'unknown') loader = /fabric/i.test(modLoader) ? 'fabric' : /neoforge/i.test(modLoader) ? 'neoforge' : /forge/i.test(modLoader) ? 'forge' : 'vanilla';
+  }
+  const modrinthIndex = readJsonIfPresent(path.join(gameRoot, 'modrinth.index.json'));
+  if (modrinthIndex) {
+    const dependencies = modrinthIndex.dependencies || {};
+    const loaderKeys = Object.keys(dependencies);
+    if (!version && dependencies.minecraft) version = String(dependencies.minecraft);
+    if (!loader || loader === 'unknown') {
+      loader = loaderKeys.some(key => /^fabric-loader$/i.test(key)) ? 'fabric'
+        : loaderKeys.some(key => /^neoforge$/i.test(key)) ? 'neoforge'
+          : loaderKeys.some(key => /^forge$/i.test(key)) ? 'forge' : 'vanilla';
+    }
+  }
+
+  if (launchProfile) {
+    const importedProfile = readJsonIfPresent(path.join(versionsPath, launchProfile, `${launchProfile}.json`));
+    if (importedProfile) {
+      version ||= String(importedProfile.inheritsFrom || importedProfile.id || '');
+      loader ||= /fabric/i.test(launchProfile) ? 'fabric' : /neoforge/i.test(launchProfile) ? 'neoforge' : /forge/i.test(launchProfile) ? 'forge' : 'vanilla';
+    } else launchProfile = '';
+  }
+
+  if (!version || !loader || loader === 'unknown' || loader === 'custom') {
+    const ranked = candidates.sort((a, b) => Number(b.hasParent) - Number(a.hasParent));
+    const selected = ranked.find(item => !loader || loader === 'unknown' || item.loader === loader) || ranked[0];
+    if (selected) {
+      version ||= selected.version;
+      if (!loader || loader === 'unknown') loader = selected.loader;
+      if (selected.hasParent && (!loader || selected.loader === loader)) launchProfile ||= selected.profileId;
+      versionType ||= selected.versionType;
+    }
+  }
+  if (!version) {
+    const versionsFromMods = new Set();
+    try {
+      for (const item of fs.readdirSync(path.join(gameRoot, 'mods'), { withFileTypes: true })) {
+        if (!item.isFile() || !item.name.toLowerCase().endsWith('.jar')) continue;
+        for (const match of item.name.matchAll(/(?:^|[-_.+])(?:mc|minecraft)[-_. ]?(\d+\.\d+(?:\.\d+)?)(?=$|[-_.+])/gi)) versionsFromMods.add(match[1]);
+      }
+    } catch {}
+    if (versionsFromMods.size === 1) version = [...versionsFromMods][0];
+  }
+  if (!version) {
+    const folderVersion = path.basename(folderPath).match(/^(\d+\.\d+(?:\.\d+)?)(?:[-_ ].*)?$/);
+    if (folderVersion) version = folderVersion[1];
+  }
+  if (!loader || loader === 'unknown' || loader === 'custom') loader = await detectModLoaderFromJars(gameRoot);
+  let hasModJars = false;
+  try { hasModJars = fs.readdirSync(path.join(gameRoot, 'mods'), { withFileTypes: true }).some(entry => entry.isFile() && entry.name.toLowerCase().endsWith('.jar')); } catch {}
+  if ((!loader || loader === 'unknown') && version && !candidates.length && !hasModJars) loader = 'vanilla';
+  if (!['vanilla', 'fabric', 'forge', 'neoforge'].includes(loader)) throw new Error('Could not identify whether this modpack uses Vanilla, Fabric, Forge, or NeoForge.');
+  if (loader === 'neoforge' && !launchProfile) throw new Error('This NeoForge pack does not include an installed NeoForge launch profile. Import a fully installed instance folder.');
+  if (loader !== 'vanilla' && !launchProfile) {
+    const profile = candidates.find(item => item.loader === loader && item.hasParent && item.version === version);
+    if (profile) launchProfile = profile.profileId;
+    // Many modpack folders contain only mods/config and no launcher-generated
+    // versions profile. The importer installs a matching loader profile after
+    // copying the pack, so this is a supported case rather than a detection error.
+  }
+  if (!/^\d+\.\d+(?:\.\d+)?(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) throw new Error('Could not identify a Minecraft version in this modpack. Include its installed versions folder or launcher profile.');
+  if (launchProfile && !/^[a-zA-Z0-9._-]+$/.test(launchProfile)) throw new Error('The modpack contains an invalid loader profile name.');
+  return { gameRoot, existingMetadata, version, loader, launchProfile, versionType };
+}
+
+function importedPackHasFancyMenu(instancePath) {
+  const modsPath = path.join(instancePath, 'mods');
+  const registry = readModrinthRegistry(modsPath);
+  const fancyMenu = ECLIPSE_CUSTOMIZATION_MODS.find(mod => mod.slug === 'fancymenu');
+  if (Object.values(registry).some(mod => mod?.projectId === fancyMenu.id || String(mod?.slug || '').toLowerCase() === 'fancymenu')) return true;
+  return listJarFiles(modsPath).some(fileName => normalizeModIdentity(baseJarName(fileName)).includes('fancymenu'));
+}
+
+async function addEclipseThemeToImportedPack(folder, instancePath, metadata) {
+  if (importedPackHasFancyMenu(instancePath)) {
+    metadata.eclipseCustomization = true;
+    return 'already-present';
+  }
+  const loader = String(metadata.loader || '').toLowerCase();
+  if (!['fabric', 'forge'].includes(loader)) {
+    metadata.eclipseCustomization = false;
+    return 'unavailable';
+  }
+  const fancyMenu = ECLIPSE_CUSTOMIZATION_MODS.find(mod => mod.slug === 'fancymenu');
+  try { await findCompatibleModrinthVersionWithDependencies(fancyMenu.id, { metadata }); }
+  catch (error) {
+    if (error.code !== 'MODRINTH_INCOMPATIBLE') throw error;
+    metadata.eclipseCustomization = false;
+    return 'unavailable';
+  }
+
+  const installed = await installModrinthProject(null, folder, fancyMenu.id, false);
+  if (!installed.installedCount) {
+    metadata.eclipseCustomization = true;
+    return 'already-present';
+  }
+
+  const staging = fs.mkdtempSync(path.join(app.getPath('temp'), 'eclipse-import-theme-'));
+  try {
+    const archive = path.join(staging, 'config.zip');
+    const extracted = path.join(staging, 'extracted');
+    await downloadEclipseReleaseAsset(ECLIPSE_CONFIG_ZIP_URL, archive, 16 * 1024 * 1024);
+    let uncompressedBytes = 0;
+    await extractZip(archive, {
+      dir: extracted,
+      onEntry(entry) {
+        const normalized = entry.fileName.replace(/\\/g, '/');
+        const parts = normalized.split('/');
+        if (!normalized || normalized.startsWith('/') || /^[a-z]:/i.test(normalized) || parts.includes('..') || entry.fileName.includes('\\')) {
+          throw new Error('The Eclipse customization config archive contains an unsafe path.');
+        }
+        const mode = (entry.externalFileAttributes >> 16) & 0xF000;
+        if (mode === 0xA000) throw new Error('The Eclipse customization config archive contains a symbolic link.');
+        uncompressedBytes += Number(entry.uncompressedSize) || 0;
+        if (uncompressedBytes > 32 * 1024 * 1024) throw new Error('The Eclipse customization config archive is larger than expected.');
+      }
+    });
+    const source = path.join(extracted, 'fancymenu');
+    const stat = fs.lstatSync(source);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('The Eclipse Menu configuration is missing from config.zip.');
+    const configPath = path.join(instancePath, 'config');
+    fs.mkdirSync(configPath, { recursive: true });
+    fs.cpSync(source, path.join(configPath, 'fancymenu'), { recursive: true, force: true });
+  } finally { fs.rmSync(staging, { recursive: true, force: true }); }
+
+  metadata.eclipseCustomization = true;
+  const registry = readModrinthRegistry(path.join(instancePath, 'mods'));
+  const importedBuiltIns = listJarFiles(path.join(instancePath, 'mods'))
+    .map(baseJarName)
+    .filter(fileName => registry[fileName]?.projectId === fancyMenu.id);
+  metadata.eclipseCustomizationBuiltInMods = [...new Set([
+    ...(Array.isArray(metadata.eclipseCustomizationBuiltInMods) ? metadata.eclipseCustomizationBuiltInMods : []),
+    ...importedBuiltIns
+  ])];
+  await ensureEclipseEssentialsPack(null, folder, instancePath, metadata);
+  return 'added';
+}
+
+async function importModpackFolder(sourcePath, importMode, addEclipseTheme = true) {
+  const source = path.resolve(sourcePath);
+  const sourceStat = fs.lstatSync(source);
+  const isZip = sourceStat.isFile() && path.extname(source).toLowerCase() === '.zip';
+  if ((!sourceStat.isDirectory() || sourceStat.isSymbolicLink()) && !isZip) throw new Error('Choose a modpack folder or .zip file.');
+  const instancesRoot = path.resolve(instancesDir);
+  if (source === instancesRoot || source.startsWith(`${instancesRoot}${path.sep}`)) throw new Error('Choose a modpack folder outside Eclipse’s instances folder.');
+  let extractionRoot = '';
+  let importRoot = source;
+  if (isZip) {
+    extractionRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'eclipse-modpack-'));
+    try { await extractZip(source, { dir: extractionRoot }); }
+    catch (error) { await fs.promises.rm(extractionRoot, { recursive: true, force: true }); throw new Error(`Could not open this modpack ZIP: ${error.message}`); }
+    importRoot = extractionRoot;
+  }
+  let inspected;
+  try { inspected = await inspectImportedModpack(importRoot); }
+  catch (error) { if (extractionRoot) await fs.promises.rm(extractionRoot, { recursive: true, force: true }); throw error; }
+  let entry, majorVersion, runtimeComponent, runtime;
+  try {
+    ({ entry, majorVersion, runtimeComponent } = await resolveMinecraftVersion(inspected.version));
+    runtime = await installJavaRuntime(runtimeComponent, () => {});
+  } catch (error) {
+    if (extractionRoot) await fs.promises.rm(extractionRoot, { recursive: true, force: true });
+    throw error;
+  }
+  const displayName = path.basename(source, isZip ? path.extname(source) : '').replace(/\s+/g, ' ').trim().slice(0, 32) || 'Imported Modpack';
+  const folder = safeInstanceFolder(displayName);
+  const destination = path.join(instancesRoot, folder);
+  if (fs.existsSync(destination)) { if (extractionRoot) await fs.promises.rm(extractionRoot, { recursive: true, force: true }); throw new Error(`An instance named “${displayName}” already exists. Rename the source folder and try again.`); }
+  fs.mkdirSync(instancesRoot, { recursive: true });
+  let copied = false;
+  let movedSource = false;
+  try {
+    if (importMode === 'move' && !isZip) {
+      try { await fs.promises.rename(inspected.gameRoot, destination); movedSource = true; }
+      catch (error) {
+        if (error.code !== 'EXDEV') throw error;
+        await fs.promises.cp(inspected.gameRoot, destination, { recursive: true, errorOnExist: true, force: false });
+        copied = true;
+      }
+    } else {
+      await fs.promises.cp(inspected.gameRoot, destination, { recursive: true, errorOnExist: true, force: false });
+      copied = true;
+    }
+    for (const directory of ['mods', 'config', 'resourcepacks', 'shaderpacks', 'versions']) fs.mkdirSync(path.join(destination, directory), { recursive: true });
+    if (inspected.loader !== 'vanilla' && !inspected.launchProfile) {
+      const loaderProgress = Object.assign(() => {}, {
+        runtimeJavaPath: runtime.javaPath,
+        runtimeComponent,
+        runtimeVersion: runtime.runtimeVersion
+      });
+      const loaderInfo = await prepareCustomLoader(destination, inspected.version, inspected.loader, loaderProgress);
+      inspected.launchProfile = loaderInfo.launchProfile;
+    }
+    if (inspected.launchProfile) {
+      const profile = readJsonIfPresent(path.join(destination, 'versions', inspected.launchProfile, `${inspected.launchProfile}.json`));
+      if (!profile || profile.inheritsFrom !== inspected.version) throw new Error('The imported loader profile does not match its Minecraft version.');
+    }
+    const metadata = {
+      ...inspected.existingMetadata,
+      name: displayName,
+      version: inspected.version,
+      loader: inspected.loader[0].toUpperCase() + inspected.loader.slice(1),
+      icon: typeof inspected.existingMetadata.icon === 'string' ? inspected.existingMetadata.icon : '',
+      customInstance: true,
+      createdBy: 'imported',
+      importedAt: Date.now(),
+      lastPlayed: Number(inspected.existingMetadata.lastPlayed) || 0,
+      playtimeMs: Math.max(0, Number(inspected.existingMetadata.playtimeMs) || 0),
+      launchProfile: inspected.launchProfile,
+      runtimeComponent,
+      runtimeVersion: runtime.runtimeVersion,
+      javaMajorVersion: majorVersion,
+      versionType: inspected.versionType || entry.type,
+      builtInMods: Array.isArray(inspected.existingMetadata.builtInMods) ? inspected.existingMetadata.builtInMods : []
+    };
+    fs.writeFileSync(path.join(destination, 'eclipse-instance.json'), JSON.stringify(metadata, null, 2), 'utf8');
+    fs.writeFileSync(path.join(destination, 'downloaded.txt'), 'Imported and prepared by Eclipse Launcher.\n', 'utf8');
+    const eclipseThemeStatus = addEclipseTheme
+      ? await addEclipseThemeToImportedPack(folder, destination, metadata)
+      : (metadata.eclipseCustomization = false, 'disabled');
+    fs.writeFileSync(path.join(destination, 'eclipse-instance.json'), JSON.stringify(metadata, null, 2), 'utf8');
+    if (!isInstanceInstalled(folder, metadata)) throw new Error('The imported folder is missing a required Minecraft profile or runtime file.');
+    let sourceRetained = false;
+    if (importMode === 'move' && isZip) {
+      try { await fs.promises.rm(source, { force: false, maxRetries: 3, retryDelay: 150 }); }
+      catch { sourceRetained = true; }
+    } else if (importMode === 'move' && copied && inspected.gameRoot === source) {
+      try { await fs.promises.rm(source, { recursive: true, force: false, maxRetries: 3, retryDelay: 150 }); }
+      catch { sourceRetained = true; }
+    } else if (importMode === 'move' && inspected.gameRoot !== source && fs.existsSync(source)) {
+      try { await fs.promises.rm(source, { recursive: true, force: false, maxRetries: 3, retryDelay: 150 }); }
+      catch { sourceRetained = true; }
+    }
+    return { ...metadata, folder, installed: true, sourceRetained, eclipseThemeStatus };
+  } catch (error) {
+    if (movedSource && fs.existsSync(destination) && !fs.existsSync(source)) {
+      try { await fs.promises.rename(destination, source); }
+      catch { throw new Error(`Import failed and Eclipse could not move the folder back. Your modpack is at ${destination}. ${error.message}`); }
+    } else if (fs.existsSync(destination)) {
+      await fs.promises.rm(destination, { recursive: true, force: true, maxRetries: 3, retryDelay: 150 });
+    }
+    throw error;
+  } finally {
+    if (extractionRoot) await fs.promises.rm(extractionRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 150 }).catch(() => {});
   }
 }
 function ensureDirs() {
   fs.mkdirSync(instancesDir, { recursive: true });
   if (!isDev) {
-    const bundledInstances = path.join(app.getAppPath(), 'instances');
+    const bundledInstances = path.join(appRoot, 'instances');
     if (fs.existsSync(bundledInstances)) {
       for (const entry of fs.readdirSync(bundledInstances, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
@@ -2466,8 +3134,15 @@ function ensureDirs() {
       profile: { mode: 'offline', name: 'Steve', status: 'online' },
       profiles: [{ id: 'offline-default', type: 'offline', mode: 'offline', name: 'Steve', status: 'online' }],
       selectedProfileId: 'offline-default',
+      lastAccountType: 'microsoft',
       animationSpeed: 'normal',
       playAnimationSpeed: 'relaxed',
+      quickLaunchLevel: 'min',
+      launchAction: 'hide',
+      memoryAllocationMb: getRecommendedMemoryAllocationMb(),
+      minecraftResolutionWidth: 1280,
+      minecraftResolutionHeight: 720,
+      minecraftFullscreen: false,
       showPlaytime: true,
       playtimePosition: 'left',
       showFriendsBox: true,
@@ -2544,6 +3219,17 @@ function normalizeSettings(settings = {}) {
   const animationSpeeds = new Set(['fast', 'normal', 'relaxed', 'slow', 'off']);
   const animationSpeed = animationSpeeds.has(settings.animationSpeed) ? settings.animationSpeed : 'normal';
   const playAnimationSpeed = animationSpeeds.has(settings.playAnimationSpeed) ? settings.playAnimationSpeed : 'relaxed';
+  const launchActions = new Set(['minimize', 'close', 'hide', 'nothing']);
+  const launchAction = launchActions.has(settings.launchAction) ? settings.launchAction : 'hide';
+  const lastAccountType = settings.lastAccountType === 'offline' ? 'offline' : 'microsoft';
+  const memoryAllocationMaxMb = getMaximumMemoryAllocationMb();
+  const requestedMemoryMb = Number(settings.memoryAllocationMb);
+  const memoryAllocationMb = Number.isFinite(requestedMemoryMb)
+    ? Math.max(1024, Math.min(memoryAllocationMaxMb, Math.round(requestedMemoryMb / 512) * 512))
+    : getRecommendedMemoryAllocationMb(memoryAllocationMaxMb);
+  const minecraftResolutionWidth = normalizeResolutionDimension(settings.minecraftResolutionWidth, 1280, 320, 7680);
+  const minecraftResolutionHeight = normalizeResolutionDimension(settings.minecraftResolutionHeight, 720, 240, 4320);
+  const minecraftFullscreen = settings.minecraftFullscreen === true;
   const showPlaytime = settings.showPlaytime !== false;
   const playtimePosition = settings.playtimePosition === 'right' ? 'right' : 'left';
   const showFriendsBox = typeof settings.showFriendsBox === 'boolean'
@@ -2554,17 +3240,40 @@ function normalizeSettings(settings = {}) {
   const utilityModsEnabledByDefault = settings.utilityModsEnabledByDefault === true;
   const useTLSkinsEnabledByDefault = settings.useTLSkinsEnabledByDefault === true;
   const sidebarPages = ['home', 'mods', 'profile', 'settings'];
+  const accentColor = /^#[0-9a-f]{6}$/i.test(settings.accentColor) ? settings.accentColor.toLowerCase() : '#963cff';
+  const glassStrength = Number.isFinite(Number(settings.glassStrength)) ? Math.max(0, Math.min(100, Math.round(Number(settings.glassStrength)))) : 62;
+  const backgroundBlur = Number.isFinite(Number(settings.backgroundBlur)) ? Math.max(0, Math.min(32, Math.round(Number(settings.backgroundBlur)))) : 16;
+  const performanceMode = settings.performanceMode === true;
+  const quickLaunchLevel = ['off', 'min', 'max'].includes(settings.quickLaunchLevel) ? settings.quickLaunchLevel : 'min';
   const requestedSidebarOrder = Array.isArray(settings.sidebarOrder) ? settings.sidebarOrder.filter(page => sidebarPages.includes(page)) : [];
   const sidebarOrder = [...new Set(requestedSidebarOrder), ...sidebarPages.filter(page => !requestedSidebarOrder.includes(page))];
   const newsEnabled = settings.newsEnabled !== false;
   const pinnedInstances = Array.isArray(settings.pinnedInstances) ? [...new Set(settings.pinnedInstances.filter(folder => typeof folder === 'string'))] : [];
   const modsInstanceFolder = typeof settings.modsInstanceFolder === 'string' ? settings.modsInstanceFolder : '';
-  return { ...settings, animationSpeed, playAnimationSpeed, showPlaytime, playtimePosition, showFriendsBox, showQuickLaunch, performanceModsEnabledByDefault, utilityModsEnabledByDefault, useTLSkinsEnabledByDefault, newsEnabled, sidebarOrder, pinnedInstances, modsInstanceFolder, profiles: normalizedProfiles, selectedProfileId: selectedProfile.id, profile: selectedProfile };
+  return { ...settings, theme: 'dark', accentColor, glassStrength, backgroundBlur, performanceMode, quickLaunchLevel, animationSpeed, playAnimationSpeed, launchAction, lastAccountType, memoryAllocationMb, memoryAllocationMaxMb, minecraftResolutionWidth, minecraftResolutionHeight, minecraftFullscreen, showPlaytime, playtimePosition, showFriendsBox, showQuickLaunch, performanceModsEnabledByDefault, utilityModsEnabledByDefault, useTLSkinsEnabledByDefault, newsEnabled, sidebarOrder, pinnedInstances, modsInstanceFolder, profiles: normalizedProfiles, selectedProfileId: selectedProfile.id, profile: selectedProfile };
+}
+
+function getMaximumMemoryAllocationMb() {
+  const totalMemoryMb = Math.floor(os.totalmem() / (1024 * 1024));
+  // Leave at least 2 GB for Windows and other apps, while keeping 1 GB available
+  // on low-memory computers. The cap avoids needlessly large heap allocations.
+  return Math.max(1024, Math.min(16384, Math.floor((totalMemoryMb - 2048) / 512) * 512));
+}
+
+function getRecommendedMemoryAllocationMb(maximum = getMaximumMemoryAllocationMb()) {
+  const totalMemoryMb = Math.floor(os.totalmem() / (1024 * 1024));
+  const halfSystemMemory = Math.floor(totalMemoryMb / 2 / 512) * 512;
+  return Math.max(1024, Math.min(maximum, 4096, halfSystemMemory));
+}
+
+function normalizeResolutionDimension(value, fallback, minimum, maximum) {
+  const dimension = Number(value);
+  return Number.isInteger(dimension) && dimension >= minimum && dimension <= maximum ? dimension : fallback;
 }
 
 function publicSettings(settings) {
   const normalized = normalizeSettings(settings);
-  const publicProfiles = normalized.profiles.map(({ refreshTokenEncrypted, ...profile }) => profile);
+  const publicProfiles = normalized.profiles.map(({ refreshTokenEncrypted, minecraftAccessTokenEncrypted, minecraftAccessTokenExpiresAt, ...profile }) => profile);
   const selectedProfile = publicProfiles.find(profile => profile.id === normalized.selectedProfileId) || publicProfiles[0];
   return { ...normalized, profiles: publicProfiles, profile: selectedProfile };
 }
@@ -2785,19 +3494,23 @@ async function fetchJsonResponse(url, options = {}) {
 
 async function requestJson(url, options = {}) {
   const { response, body } = await fetchJsonResponse(url, options);
-    if (!response.ok) {
-      const detail = body.error_description || body.Message || body.error || `HTTP ${response.status}`;
-      throw new Error(String(detail));
-    }
-    return body;
+  if (!response.ok) {
+    const detail = body.error_description || body.errorMessage || body.Message || body.error || `HTTP ${response.status}`;
+    throw new Error(String(detail));
+  }
+  return body;
 }
 
-async function exchangeMicrosoftForMinecraft(msaAccessToken) {
+const MINECRAFT_LAUNCHER_CLIENT_ID = '00000000402b5328';
+const MINECRAFT_LAUNCHER_REDIRECT_URI = 'https://login.live.com/oauth20_desktop.srf';
+const pendingMicrosoftLogins = new Map();
+
+async function exchangeMicrosoftForMinecraft(msaAccessToken, legacy = false) {
   const xbox = await requestJson('https://user.auth.xboxlive.com/user/authenticate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      Properties: { AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: `d=${msaAccessToken}` },
+      Properties: { AuthMethod: 'RPS', SiteName: 'user.auth.xboxlive.com', RpsTicket: legacy ? msaAccessToken : `d=${msaAccessToken}` },
       RelyingParty: 'http://auth.xboxlive.com',
       TokenType: 'JWT'
     })
@@ -2814,11 +3527,18 @@ async function exchangeMicrosoftForMinecraft(msaAccessToken) {
   }
   const userHash = xsts.DisplayClaims?.xui?.[0]?.uhs;
   if (!userHash || !xsts.Token) throw new Error('Xbox sign-in returned an incomplete response.');
-  const minecraft = await requestJson('https://api.minecraftservices.com/authentication/login_with_xbox', {
+  const { response: minecraftResponse, body: minecraft } = await fetchJsonResponse('https://api.minecraftservices.com/authentication/login_with_xbox', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ identityToken: `XBL3.0 x=${userHash};${xsts.Token}` })
   });
+  if (!minecraftResponse.ok) {
+    const detail = String(minecraft.errorMessage || minecraft.error || minecraft.Message || '');
+    if (minecraftResponse.status === 403 && /invalid app registration/i.test(detail)) {
+      throw new Error('Microsoft sign-in worked, but Minecraft Services rejected this app registration. Eclipse needs its own Microsoft public Client ID approved for Minecraft Services.');
+    }
+    throw new Error(detail || `Minecraft sign-in failed (HTTP ${minecraftResponse.status}).`);
+  }
   const { response: profileResponse, body: profile } = await fetchJsonResponse('https://api.minecraftservices.com/minecraft/profile', {
     headers: { Authorization: `Bearer ${minecraft.access_token}`, Accept: 'application/json' }
   });
@@ -2826,99 +3546,89 @@ async function exchangeMicrosoftForMinecraft(msaAccessToken) {
   if (!profileResponse.ok) throw new Error(profile.errorMessage || `Could not load the Minecraft profile (HTTP ${profileResponse.status}).`);
   if (!profile.id || !profile.name || !minecraft.access_token) throw new Error('Minecraft returned an incomplete profile.');
   const xuid = xsts.DisplayClaims?.xui?.[0]?.xid || xbox.DisplayClaims?.xui?.[0]?.xid || '';
-  return { accessToken: minecraft.access_token, uuid: profile.id, name: profile.name, xuid };
+  const expiresInSeconds = Number(minecraft.expires_in);
+  return {
+    accessToken: minecraft.access_token,
+    expiresAt: Number.isFinite(expiresInSeconds) && expiresInSeconds > 0 ? Date.now() + expiresInSeconds * 1000 : 0,
+    uuid: profile.id,
+    name: profile.name,
+    xuid
+  };
 }
 
-async function receiveMicrosoftAuthorizationCode(clientId) {
-  const verifier = crypto.randomBytes(32).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+async function beginMicrosoftAuthorization() {
   const state = crypto.randomBytes(24).toString('hex');
-  const server = http.createServer();
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const address = server.address();
-  const redirectUri = `http://localhost:${address.port}`;
-  let timeout;
-  const codePromise = new Promise((resolve, reject) => {
-    timeout = setTimeout(() => reject(new Error('Microsoft sign-in timed out. Please try again.')), 3 * 60 * 1000);
-    server.on('request', (request, response) => {
-      const callback = new URL(request.url, redirectUri);
-      if (callback.pathname !== '/') {
-        response.writeHead(404).end('Not found');
-        return;
-      }
-      if (callback.searchParams.get('state') !== state) {
-        response.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Sign-in could not be verified. Return to Eclipse and try again.');
-        reject(new Error('Microsoft sign-in could not be verified. Please try again.'));
-        return;
-      }
-      const error = callback.searchParams.get('error');
-      const code = callback.searchParams.get('code');
-      response.writeHead(error || !code ? 400 : 200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(error || !code
-        ? '<!doctype html><title>Sign-in cancelled</title><p>Sign-in was not completed. You can close this tab and return to Eclipse.</p>'
-        : '<!doctype html><title>Sign-in complete</title><p>Sign-in complete. You can close this tab and return to Eclipse Launcher.</p>');
-      if (error) reject(new Error(callback.searchParams.get('error_description') || 'Microsoft sign-in was cancelled.'));
-      else if (code) resolve(code);
-      else reject(new Error('Microsoft did not return an authorization code.'));
-    });
-  });
-
-  try {
-    const authorize = new URL('https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize');
-    authorize.search = new URLSearchParams({
-      client_id: clientId,
-      response_type: 'code',
-      redirect_uri: redirectUri,
-      scope: 'XboxLive.signin offline_access',
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      state,
-      prompt: 'select_account'
-    }).toString();
-    await shell.openExternal(authorize.href);
-    const code = await codePromise;
-    return { code, verifier, redirectUri };
-  } finally {
-    clearTimeout(timeout);
-    server.close();
+  const now = Date.now();
+  for (const [key, pending] of pendingMicrosoftLogins) {
+    if (pending.expiresAt <= now) pendingMicrosoftLogins.delete(key);
   }
+  pendingMicrosoftLogins.set(state, { expiresAt: now + 5 * 60 * 1000 });
+  const authorize = new URL('https://login.live.com/oauth20_authorize.srf');
+  authorize.search = new URLSearchParams({
+    client_id: MINECRAFT_LAUNCHER_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: MINECRAFT_LAUNCHER_REDIRECT_URI,
+    scope: 'service::user.auth.xboxlive.com::MBI_SSL',
+    display: 'touch',
+    locale: 'en',
+    state
+  }).toString();
+  try {
+    await shell.openExternal(authorize.href);
+  } catch (error) {
+    pendingMicrosoftLogins.delete(state);
+    throw error;
+  }
+  return true;
 }
 
-async function addMicrosoftProfile(clientId) {
-  const normalizedClientId = String(clientId || '').trim();
-  if (!/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(normalizedClientId)) {
-    throw new Error('Enter the Microsoft app Client ID first. Eclipse needs its own registered public app ID to open secure sign-in.');
-  }
+async function addMicrosoftProfile(callbackUrl) {
   const settings = readSettings();
-  settings.microsoftClientId = normalizedClientId;
-  writeSettings(settings);
-
-  const { code, verifier, redirectUri } = await receiveMicrosoftAuthorizationCode(normalizedClientId);
-  const token = await requestJson('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+  let callback;
+  try {
+    callback = new URL(String(callbackUrl || '').trim());
+  } catch {
+    throw new Error('Paste the full Microsoft redirect URL from your browser address bar.');
+  }
+  if (callback.protocol !== 'https:' || callback.hostname !== 'login.live.com' || callback.pathname !== '/oauth20_desktop.srf') {
+    throw new Error('That URL is not the expected Microsoft sign-in redirect. Copy the full address bar URL after sign-in.');
+  }
+  const state = callback.searchParams.get('state');
+  const pending = state ? pendingMicrosoftLogins.get(state) : null;
+  if (!pending || pending.expiresAt <= Date.now()) {
+    if (state) pendingMicrosoftLogins.delete(state);
+    throw new Error('This sign-in has expired or could not be verified. Start Microsoft sign-in again.');
+  }
+  pendingMicrosoftLogins.delete(state);
+  if (callback.searchParams.has('error')) throw new Error(callback.searchParams.get('error_description') || 'Microsoft sign-in was cancelled.');
+  const code = callback.searchParams.get('code');
+  if (!code) throw new Error('Microsoft did not return an authorization code. Copy the full redirect URL and try again.');
+  const token = await requestJson('https://login.live.com/oauth20_token.srf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body: new URLSearchParams({
-      client_id: normalizedClientId,
+      client_id: MINECRAFT_LAUNCHER_CLIENT_ID,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier,
-      scope: 'XboxLive.signin offline_access'
+      redirect_uri: MINECRAFT_LAUNCHER_REDIRECT_URI,
+      scope: 'service::user.auth.xboxlive.com::MBI_SSL'
     })
   });
-  if (!token.access_token || !token.refresh_token) throw new Error('Microsoft sign-in did not return a renewable session. Check that the app registration allows public client flows.');
-  const minecraft = await exchangeMicrosoftForMinecraft(token.access_token);
+  if (!token.access_token || !token.refresh_token) throw new Error('Microsoft sign-in did not return a renewable session. Please try again.');
+  const minecraft = await exchangeMicrosoftForMinecraft(token.access_token, true);
   const profile = {
     id: crypto.randomUUID(),
     type: 'microsoft',
     mode: 'microsoft',
     name: minecraft.name,
     uuid: minecraft.uuid,
+    xuid: minecraft.xuid,
     status: 'online',
-    refreshTokenEncrypted: encryptRefreshToken(token.refresh_token)
+    authFlow: 'legacy-minecraft-launcher',
+    clientId: MINECRAFT_LAUNCHER_CLIENT_ID,
+    refreshTokenEncrypted: encryptRefreshToken(token.refresh_token),
+    minecraftAccessTokenEncrypted: encryptRefreshToken(minecraft.accessToken),
+    minecraftAccessTokenExpiresAt: minecraft.expiresAt
   };
   settings.profiles.push(profile);
   settings.selectedProfileId = profile.id;
@@ -2927,26 +3637,46 @@ async function addMicrosoftProfile(clientId) {
 }
 
 async function refreshMicrosoftSession(profile, settings) {
-  if (!settings.microsoftClientId) throw new Error('Add a Microsoft app Client ID in the profile setup first.');
-  const token = await requestJson('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+  const legacy = profile.authFlow === 'legacy-minecraft-launcher';
+  const clientId = profile.clientId || settings.microsoftClientId;
+  if (!clientId) throw new Error('This Microsoft profile needs to be reconnected before it can launch.');
+  // Minecraft access tokens carry their own expiry. Reusing a securely stored
+  // token avoids five sequential auth/profile requests on every launcher start.
+  if (profile.minecraftAccessTokenEncrypted && Number(profile.minecraftAccessTokenExpiresAt) > Date.now() + 5 * 60 * 1000) {
+    try {
+      const accessToken = decryptRefreshToken({ refreshTokenEncrypted: profile.minecraftAccessTokenEncrypted });
+      if (accessToken && profile.uuid && profile.name) {
+        return { accessToken, uuid: profile.uuid, name: profile.name, xuid: profile.xuid || '' };
+      }
+    } catch {
+      // A cache that cannot be decrypted is discarded by replacing it on refresh.
+    }
+  }
+  const token = await requestJson(legacy ? 'https://login.live.com/oauth20_token.srf' : 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
     body: new URLSearchParams({
-      client_id: settings.microsoftClientId,
+      client_id: clientId,
       grant_type: 'refresh_token',
       refresh_token: decryptRefreshToken(profile),
-      scope: 'XboxLive.signin offline_access'
+      ...(legacy ? {} : { scope: 'XboxLive.signin offline_access' })
     })
   });
-  const session = await exchangeMicrosoftForMinecraft(token.access_token);
+  const session = await exchangeMicrosoftForMinecraft(token.access_token, legacy);
   if (profile.uuid && profile.uuid !== session.uuid) throw new Error('The signed-in Minecraft profile does not match this saved account. Reconnect the profile.');
-  if (token.refresh_token) {
-    const current = readSettings();
-    current.profiles = current.profiles.map(saved => saved.id === profile.id
-      ? { ...saved, refreshTokenEncrypted: encryptRefreshToken(token.refresh_token), name: session.name, uuid: session.uuid }
-      : saved);
-    writeSettings(current);
-  }
+  const current = readSettings();
+  current.profiles = current.profiles.map(saved => saved.id === profile.id
+    ? {
+        ...saved,
+        ...(token.refresh_token ? { refreshTokenEncrypted: encryptRefreshToken(token.refresh_token) } : {}),
+        minecraftAccessTokenEncrypted: encryptRefreshToken(session.accessToken),
+        minecraftAccessTokenExpiresAt: session.expiresAt,
+        name: session.name,
+        uuid: session.uuid,
+        xuid: session.xuid
+      }
+    : saved);
+  writeSettings(current);
   return session;
 }
 
@@ -2965,7 +3695,7 @@ async function skinJson(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', 'User-Agent': 'EclipseLauncher/0.10.30' } });
+    const response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', 'User-Agent': LAUNCHER_USER_AGENT } });
     if (!response.ok) return null;
     return await response.json();
   } catch { return null; }
@@ -3023,7 +3753,7 @@ async function downloadProfileSkin(profileId) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-  const response = await fetch(skinUrl, { signal: controller.signal, headers: { Accept: 'image/png', 'User-Agent': 'EclipseLauncher/0.10.30' } });
+  const response = await fetch(skinUrl, { signal: controller.signal, headers: { Accept: 'image/png', 'User-Agent': LAUNCHER_USER_AGENT } });
     if (!response.ok || !/^image\/png\b/i.test(response.headers.get('content-type') || '')) throw new Error('Ely.by could not provide this skin image.');
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.length > 5 * 1024 * 1024 || bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') throw new Error('The downloaded skin was not a valid PNG image.');
@@ -3063,7 +3793,7 @@ function createWindow() {
     frame: false,
     icon: appIconPath,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(sourceDirectory, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -3079,11 +3809,102 @@ function createWindow() {
     appendLauncherLog('Renderer process', `Renderer exited: ${details.reason || 'unknown reason'}${details.exitCode == null ? '' : ` (exit ${details.exitCode})`}.`);
   });
   win.webContents.on('unresponsive', () => appendLauncherLog('Renderer process', 'The launcher window became unresponsive.'));
-  win.once('ready-to-show', () => {
+  const reportWindowActivity = () => {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('window:activity', win.isFocused() && !win.isMinimized() && win.isVisible());
+    }
+  };
+  win.on('focus', reportWindowActivity);
+  win.on('blur', reportWindowActivity);
+  win.on('minimize', reportWindowActivity);
+  win.on('restore', reportWindowActivity);
+  win.once('ready-to-show', async () => {
+    // Apply saved appearance values before the first visible frame so the
+    // default accent and blur settings never flash during startup.
+    const appearance = publicSettings(readSettings());
+    const initialAppearance = {
+      accentColor: appearance.performanceMode ? '#963cff' : appearance.accentColor,
+      glassStrength: appearance.glassStrength,
+      backgroundBlur: appearance.performanceMode ? 0 : appearance.backgroundBlur,
+      performanceMode: appearance.performanceMode
+    };
+    try {
+      await win.webContents.executeJavaScript(`(() => {
+        const appearance = ${JSON.stringify(initialAppearance)};
+        const surfaceAlpha = (1 - appearance.glassStrength / 100 * 0.82).toFixed(2);
+        document.body.style.setProperty('--eclipse-accent', appearance.accentColor);
+        document.body.style.setProperty('--glass-alpha', surfaceAlpha);
+        document.body.style.setProperty('--glass-blur', appearance.backgroundBlur + 'px');
+        document.body.classList.toggle('performance-mode', appearance.performanceMode);
+      })()`);
+    } catch (error) {
+      appendLauncherLog('Appearance', `Could not apply saved appearance before showing the window: ${error.message}`);
+    }
+    if (win.isDestroyed()) return;
     win.maximize();
     win.show();
+    reportWindowActivity();
   });
-  win.loadFile(path.join(__dirname, 'index.html'));
+  win.loadFile(path.join(sourceDirectory, 'index.html'));
+}
+
+function sendUpdateNotice(version) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('updates:available', version);
+    }
+  }
+}
+function sendUpdateReady(version) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('updates:ready', version);
+  }
+}
+
+function initializeAutoUpdates() {
+  // electron-updater supports this launcher's packaged Windows NSIS target.
+  // Development runs and other platforms should never contact the release feed.
+  if (!app.isPackaged || process.platform !== 'win32') return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.disableDifferentialDownload = true;
+  autoUpdater.disableWebInstaller = true;
+  autoUpdater.on('checking-for-update', () => appendLauncherLog('Updater', 'Checking the GitHub release feed.'));
+  autoUpdater.on('update-available', info => {
+    lastUpdateProgressLog = -10;
+    appendLauncherLog('Updater', `Found Eclipse ${info.version}; downloading the update.`);
+    sendUpdateNotice(info.version);
+    autoUpdater.downloadUpdate().catch(error => {
+      appendLauncherLog('Updater error', `Could not download the full update package: ${error?.stack || error?.message || error}`);
+    });
+  });
+  autoUpdater.on('update-not-available', info => {
+    appendLauncherLog('Updater', `Eclipse ${info.version || LAUNCHER_VERSION} is up to date.`);
+  });
+  autoUpdater.on('download-progress', progress => {
+    const percent = Math.floor((progress.percent || 0) / 10) * 10;
+    if (percent >= lastUpdateProgressLog + 10) {
+      lastUpdateProgressLog = percent;
+      appendLauncherLog('Updater', `Downloading update: ${percent}%.`);
+    }
+  });
+  autoUpdater.on('update-downloaded', async info => {
+    downloadedUpdateVersion = info.version;
+    appendLauncherLog('Updater', `Eclipse ${info.version} has been downloaded and is ready to install.`);
+    sendUpdateNotice(info.version);
+    sendUpdateReady(info.version);
+  });
+  autoUpdater.on('error', error => {
+    appendLauncherLog('Updater error', error?.stack || error?.message || error);
+  });
+
+  // Give the launcher window time to appear before showing the in-app notice.
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(error => {
+      appendLauncherLog('Updater error', `Update check failed: ${error?.stack || error?.message || error}`);
+    });
+  }, 2500);
 }
 
 app.whenReady().then(() => {
@@ -3092,6 +3913,77 @@ app.whenReady().then(() => {
 
   ipcMain.handle('diagnostics:list', () => listDiagnosticLogs());
   ipcMain.handle('diagnostics:read', (_, id) => readDiagnosticLog(id));
+  ipcMain.handle('diagnostics:delete-crash-report', (_, id) => deleteDiagnosticCrashReport(id));
+  ipcMain.handle('app:version', () => LAUNCHER_VERSION);
+  ipcMain.handle('updates:pending-changelog', async () => {
+    const pendingFile = path.join(app.getPath('userData'), 'pending-update-changelog.json');
+    let pending;
+    try { pending = JSON.parse(fs.readFileSync(pendingFile, 'utf8')); }
+    catch { return null; }
+    if (pending.version !== LAUNCHER_VERSION) return null;
+    try {
+      const response = await fetch('https://api.github.com/repos/eclipse-launcher/eclipse-launcher.github.io/releases?per_page=100', {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': LAUNCHER_USER_AGENT, 'X-GitHub-Api-Version': '2022-11-28' }
+      });
+      if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}.`);
+      const releases = await response.json();
+      const release = releases.find(item => !item.draft && !item.prerelease && item.assets?.some(asset => /\.exe$/i.test(asset.name)));
+      if (!release) throw new Error('No published launcher release with a Windows installer was found.');
+      fs.rmSync(pendingFile, { force: true });
+      return { version: release.tag_name || release.name || LAUNCHER_VERSION, body: String(release.body || '').slice(0, 20000) };
+    } catch (error) {
+      appendLauncherLog('Updater changelog', error?.stack || error?.message || error);
+      fs.rmSync(pendingFile, { force: true });
+      return { version: LAUNCHER_VERSION, body: '', unavailable: true };
+    }
+  });
+  ipcMain.handle('updates:install', async () => {
+    const helperPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'EclipseUpdateScreen.exe')
+      : path.join(appRoot, 'build', 'EclipseUpdateScreen.exe');
+    const imagePath = app.isPackaged
+      ? path.join(process.resourcesPath, 'eclipse-updating-screen.jpg')
+      : path.join(assetsDirectory, 'eclipse-updating-screen.jpg');
+    const helperDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'eclipse-update-screen-'));
+    const temporaryHelperPath = path.join(helperDirectory, 'EclipseUpdateScreen.exe');
+    const temporaryImagePath = path.join(helperDirectory, 'eclipse-updating-screen.jpg');
+    const readyFile = path.join(helperDirectory, 'screen.ready');
+    const helperLog = path.join(app.getPath('userData'), 'logs', 'update-progress.log');
+    if (!fs.existsSync(helperPath) || !fs.existsSync(imagePath)) {
+      throw new Error('The Eclipse update screen files are missing from this installation.');
+    }
+    fs.copyFileSync(helperPath, temporaryHelperPath);
+    fs.copyFileSync(imagePath, temporaryImagePath);
+    fs.rmSync(readyFile, { force: true });
+    const helper = spawn(temporaryHelperPath, [
+      '--parent-pid', String(process.pid), '--image', temporaryImagePath,
+      '--ready', readyFile, '--log', helperLog
+    ], { detached: true, stdio: 'ignore', windowsHide: true });
+    appendLauncherLog('Updater', `Starting the update screen helper (PID ${process.pid}).`);
+    await new Promise((resolve, reject) => { helper.once('spawn', resolve); helper.once('error', reject); });
+    helper.unref();
+    const readyDeadline = Date.now() + 20000;
+    while (!fs.existsSync(readyFile) && Date.now() < readyDeadline) {
+      if (helper.exitCode !== null) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (!fs.existsSync(readyFile)) throw new Error(`The update screen exited with code ${helper.exitCode} before showing. See ${helperLog}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!fs.existsSync(readyFile)) throw new Error(`The update screen did not become ready. See ${helperLog}`);
+    if (!downloadedUpdateVersion) throw new Error('The downloaded update version is unavailable.');
+    fs.writeFileSync(path.join(app.getPath('userData'), 'pending-update-changelog.json'), JSON.stringify({ version: downloadedUpdateVersion }), 'utf8');
+    autoUpdater.quitAndInstall(true, true);
+  });
+  ipcMain.handle('community:open', async (_, destination) => {
+    const urls = {
+      discord: 'https://discord.gg/8rrsEwcbQs',
+      website: 'https://eclipse-launcher.github.io/'
+    };
+    const url = urls[destination];
+    if (!url) throw new Error('That Eclipse community link is not available.');
+    await shell.openExternal(url);
+  });
   ipcMain.on('diagnostics:renderer-error', (_event, report) => {
     if (!report || typeof report !== 'object') return;
     const kind = String(report.kind || 'error').slice(0, 40);
@@ -3165,7 +4057,7 @@ app.whenReady().then(() => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const response = await fetch(skinUrl, { signal: controller.signal, headers: { Accept: 'image/png', 'User-Agent': 'EclipseLauncher/0.10.30' } });
+      const response = await fetch(skinUrl, { signal: controller.signal, headers: { Accept: 'image/png', 'User-Agent': LAUNCHER_USER_AGENT } });
       if (!response.ok) throw new Error(`Skin image server returned HTTP ${response.status}.`);
       const bytes = Buffer.from(await response.arrayBuffer());
       if (!bytes.length || bytes.length > 4 * 1024 * 1024) throw new Error('The skin image is empty or too large to preview.');
@@ -3187,7 +4079,8 @@ app.whenReady().then(() => {
     return publicSettings(settings);
   });
 
-  ipcMain.handle('accounts:login-microsoft', async (_, clientId) => addMicrosoftProfile(clientId));
+  ipcMain.handle('accounts:begin-microsoft-login', async () => beginMicrosoftAuthorization());
+  ipcMain.handle('accounts:complete-microsoft-login', async (_, callbackUrl) => addMicrosoftProfile(callbackUrl));
   ipcMain.handle('accounts:open-registration', async () => {
     await shell.openExternal('https://entra.microsoft.com/');
     return true;
@@ -3205,15 +4098,28 @@ app.whenReady().then(() => {
     return { path: result.filePaths[0], url: pathToFileURL(result.filePaths[0]).href };
   });
 
+  ipcMain.handle('instance:choose-modpack', async event => {
+    const parent = BrowserWindow.fromWebContents(event.sender);
+    const selection = await dialog.showOpenDialog(parent, {
+      title: 'Choose a Minecraft modpack folder or ZIP',
+      properties: ['openDirectory', 'openFile'],
+      filters: [{ name: 'Minecraft modpacks', extensions: ['zip'] }]
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return selection.filePaths[0];
+  });
+  ipcMain.handle('instance:import-modpack', (_, folder, mode, addEclipseTheme) => importModpackFolder(folder, mode, addEclipseTheme !== false));
+
   ipcMain.handle('instance:create', async (_, options = {}) => {
     ensureDirs();
     const name = typeof options.name === 'string' ? options.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 32) throw new Error('Enter an instance name between 1 and 32 characters long.');
+    const group = typeof options.group === 'string' ? options.group.trim().replace(/\s+/g, ' ').slice(0, 32) : '';
     const version = typeof options.version === 'string' ? options.version.trim() : '';
     if (!version || !/^\d+\.\d+(?:\.\d+)?(?:[-+][A-Za-z0-9.-]+)?$/.test(version) || version.length > 24) throw new Error('Choose a Minecraft Version');
     const loader = String(options.loader || '').toLowerCase();
     if (!['vanilla', 'fabric', 'forge'].includes(loader)) throw new Error('Choose Vanilla, Fabric, or Forge.');
-    const icons = new Set(['', 'ironsword445x445.png', 'heartlogo266x266.png', 'hardcore-heart402x402.png', 'hacker-head187x187.png', 'golden-apple144x144.png']);
+    const icons = new Set(['', 'book-emoji.png', 'diamond-emoji.png', 'emerald-emoji.png', 'enderpearl-emoji.png', 'goldenapple-emoji.png', 'hackerhead-emoji.png', 'hardcore-emoji.png', 'heart-emoji.png', 'ironsword-emoji.png', 'picaxe-emoji.png']);
     const icon = typeof options.icon === 'string' && icons.has(options.icon) ? options.icon : null;
     if (icon === null) throw new Error('Choose one of the available instance icons.');
     const allowedPerformanceMods = new Set(PERFORMANCE_MODS.map(mod => mod.id));
@@ -3248,7 +4154,7 @@ app.whenReady().then(() => {
     if (existingNames.some(existing => String(existing).toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error('An instance with this name already exists. Choose another name.');
     const instancePath = path.join(instancesDir, folder);
     fs.mkdirSync(instancePath, { recursive: false });
-    const metadata = { name, version, loader: loader[0].toUpperCase() + loader.slice(1), icon, customInstance: true, createdBy: 'user', lastPlayed: 0, playtimeMs: 0, builtInMods: [], eclipseCustomization: true, eclipseCustomizationBuiltInMods: [], eclipseBuiltInResourcePacks: [], performanceMods: requestedPerformanceMods, utilityMods: requestedUtilityMods, addOptiFine, optifineForgeVersion, useTLSkins };
+    const metadata = { name, group, version, loader: loader[0].toUpperCase() + loader.slice(1), icon, customInstance: true, createdBy: 'user', lastPlayed: 0, playtimeMs: 0, builtInMods: [], eclipseCustomization: true, eclipseCustomizationBuiltInMods: [], eclipseBuiltInResourcePacks: [], performanceMods: requestedPerformanceMods, utilityMods: requestedUtilityMods, addOptiFine, optifineForgeVersion, useTLSkins };
     fs.writeFileSync(path.join(instancePath, 'eclipse-instance.json'), JSON.stringify(metadata, null, 2));
     return { ...metadata, folder, installed: false };
   });
@@ -3277,7 +4183,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('instances:versions', async (_, loader = 'vanilla') => {
-    const manifest = await fetchJson('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
+    const manifest = await getMinecraftVersionManifest();
     const releases = (manifest.versions || []).filter(version => version.type === 'release').map(version => version.id);
     const selectedLoader = String(loader || 'vanilla').toLowerCase();
     if (selectedLoader === 'vanilla') return releases;
@@ -3287,7 +4193,7 @@ app.whenReady().then(() => {
       return releases.filter(version => supported.has(version));
     }
     if (selectedLoader === 'forge') {
-      const response = await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml', { headers: { 'User-Agent': 'EclipseLauncher/0.10.30' } });
+      const response = await fetch('https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml', { headers: { 'User-Agent': LAUNCHER_USER_AGENT } });
       if (!response.ok) throw new Error(`Forge version lookup failed with HTTP ${response.status}.`);
       const metadataXml = await response.text();
       const supported = new Set([...metadataXml.matchAll(/<version>([^<]+)<\/version>/g)]
@@ -3324,14 +4230,15 @@ app.whenReady().then(() => {
 
   ipcMain.handle('instance:install', async (event, folder) => installInstance(event, folder));
 
-  ipcMain.handle('instance:rename', (_, folder, requestedName, requestedIcon) => {
+  ipcMain.handle('instance:rename', (_, folder, requestedName, requestedIcon, requestedGroup) => {
     if (typeof folder !== 'string' || !folder || path.basename(folder) !== folder) {
       throw new Error('That Minecraft instance could not be found.');
     }
     const name = typeof requestedName === 'string' ? requestedName.trim().replace(/\s+/g, ' ') : '';
     if (!name) throw new Error('Enter a name for this instance.');
     if (name.length > 32) throw new Error('Instance names must be 32 characters or fewer.');
-    const iconOptions = new Set(['', 'ironsword445x445.png', 'heartlogo266x266.png', 'hardcore-heart402x402.png', 'hacker-head187x187.png', 'golden-apple144x144.png']);
+    const group = typeof requestedGroup === 'string' ? requestedGroup.trim().replace(/\s+/g, ' ').slice(0, 32) : '';
+    const iconOptions = new Set(['', 'book-emoji.png', 'diamond-emoji.png', 'emerald-emoji.png', 'enderpearl-emoji.png', 'goldenapple-emoji.png', 'hackerhead-emoji.png', 'hardcore-emoji.png', 'heart-emoji.png', 'ironsword-emoji.png', 'picaxe-emoji.png']);
     if (typeof requestedIcon !== 'string' || !iconOptions.has(requestedIcon)) throw new Error('Choose one of the available instance icons.');
     const instancePath = path.join(instancesDir, folder);
     let instanceStat;
@@ -3349,6 +4256,9 @@ app.whenReady().then(() => {
       if (!profileStat.isFile() || profileStat.isSymbolicLink()) throw new Error();
       metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
     } catch { throw new Error('The instance profile file is missing or invalid.'); }
+    if (INSTANCE_RELEASES[folder] || (typeof metadata.eclipseReleaseKey === 'string' && INSTANCE_RELEASES[metadata.eclipseReleaseKey])) {
+      throw new Error('By Eclipse instances cannot be renamed.');
+    }
     const existingFolders = fs.readdirSync(instancesDir, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name !== folder);
     for (const entry of existingFolders) {
       let otherName = entry.name;
@@ -3359,7 +4269,7 @@ app.whenReady().then(() => {
     const renamedPath = path.resolve(instancesDir, renamedFolder);
     if (path.dirname(renamedPath) !== path.resolve(instancesDir)) throw new Error('That instance name produces an invalid folder path.');
     if (renamedFolder !== folder && fs.existsSync(renamedPath)) throw new Error('An instance folder with this name already exists. Choose another name.');
-    const nextMetadata = { ...metadata, name, icon: requestedIcon };
+    const nextMetadata = { ...metadata, name, icon: requestedIcon, group };
     if (INSTANCE_RELEASES[folder]) nextMetadata.eclipseReleaseKey = folder;
     const temporaryProfile = path.join(instancePath, `.eclipse-instance-${crypto.randomUUID()}.tmp`);
     fs.writeFileSync(temporaryProfile, JSON.stringify(nextMetadata, null, 2), { encoding: 'utf8', flag: 'wx' });
@@ -3467,7 +4377,6 @@ app.whenReady().then(() => {
     pendingInstanceLaunches.add(folder);
     try {
     sendLaunchStatus(event, folder, { state: 'preparing' });
-    await ensureEclipseEssentialsPack(event, folder, instanceDir, metadata);
     const runtimeComponent = metadata.runtimeComponent || (release.version === '26.2' ? 'java-runtime-epsilon' : 'java-runtime-gamma');
     const runtimeVersion = metadata.runtimeVersion || (release.version === '26.2' ? '25.0.1' : '17.0.15');
     if (!hasSafeRuntimeMetadata(runtimeComponent, runtimeVersion)) throw new Error('This instance has invalid Java runtime metadata.');
@@ -3478,7 +4387,7 @@ app.whenReady().then(() => {
     // MCLC uses its javaPath both to probe `-version` and to spawn the game. javaw.exe
     // is ideal for the game window, but suppresses the version text MCLC's probe expects.
     // Probe its companion java.exe while keeping javaw.exe as the actual game process.
-    configureLauncherHandler(launcher, javaProbePath, instanceDir);
+    configureLauncherHandler(launcher, javaProbePath, instanceDir, false, true);
     const settings = readSettings();
     const profile = settings.profile;
     const microsoftSession = profile.type === 'microsoft' ? await refreshMicrosoftSession(profile, settings) : null;
@@ -3492,7 +4401,7 @@ app.whenReady().then(() => {
         name: username,
         user_properties: '{}',
         meta: microsoftSession
-          ? { type: 'msa', demo: false, xuid: microsoftSession.xuid, clientId: settings.microsoftClientId }
+          ? { type: 'msa', demo: false, xuid: microsoftSession.xuid, clientId: profile.clientId || settings.microsoftClientId }
           : { type: 'legacy', demo: false }
       },
       root: instanceDir,
@@ -3502,21 +4411,50 @@ app.whenReady().then(() => {
         ...(release.launchProfile ? { custom: release.launchProfile } : {})
       },
       javaPath,
-      memory: { min: '1G', max: '4G' }
+      // MCLC defaults to two concurrent downloads. A higher pool helps when
+      // a launch finds missing/corrupt files; fully installed launches are unaffected.
+      overrides: { maxSockets: 12 },
+      memory: { min: '1G', max: `${settings.memoryAllocationMb}M` },
+      window: { fullscreen: settings.minecraftFullscreen, width: String(settings.minecraftResolutionWidth), height: String(settings.minecraftResolutionHeight) },
+      customArgs: [
+        ...(String(metadata.loader).toLowerCase() === 'forge' ? getForgeJvmArguments(instanceDir, release.launchProfile) : []),
+        ...(process.platform === 'win32' && release.version === '26.3' && runtimeVersion === '25.0.1'
+          ? ['-XX:-UseZGC', '-XX:+UseG1GC']
+          : [])
+      ],
+      // Mojang has a reported access violation in Microsoft Java 25.0.1's
+      // ZGC path on Windows with Minecraft 26.3. Force the supported G1
+      // collector for this affected runtime/version until that upstream
+      // JVM crash is fixed. The negative flag makes this safe if the game
+      // version JSON also supplies UseZGC.
     };
 
     let lastLaunchError = null;
     let earlyExitCode = null;
-    let minecraftReady = false;
+    let earlyProcessOutput = '';
+    let minecraftWindowOpened = false;
     let playtimeSession = null;
     let gameProcess = null;
+    let gameProcessFinalized = false;
+    let launcherWindowRestored = false;
+    let launcherWindowRestoreScheduled = false;
+    let launcherWindow = BrowserWindow.fromWebContents(event.sender);
+    let launchWindowAction = settings.launchAction;
+    let forgeLoadingWindowHidden = false;
     let loggedMinecraftErrors = 0;
     const reportLaunchProgress = createThrottledLaunchProgress(event, folder);
     const launchProgress = createLaunchProgressReporter(reportLaunchProgress);
     launchProgress.advance(5, true);
-    const markMinecraftReady = () => {
-      if (minecraftReady) return;
-      minecraftReady = true;
+    const markMinecraftWindowOpened = () => {
+      if (minecraftWindowOpened) return;
+      minecraftWindowOpened = true;
+      switch (launchWindowAction) {
+        case 'close': launcherWindow?.close(); break;
+        case 'hide': launcherWindow?.hide(); break;
+        case 'nothing': break;
+        case 'minimize':
+        default: launcherWindow?.minimize(); break;
+      }
       try {
         playtimeSession = startInstancePlaytime(folder, (playtimeMs, lastPlayed) => {
           sendLaunchStatus(event, folder, { state: 'playing', playtimeMs, lastPlayed });
@@ -3530,6 +4468,21 @@ app.whenReady().then(() => {
         lastPlayed: playtimeSession?.startedAt
       });
     };
+    const restoreLauncherWindow = () => {
+      if (launcherWindowRestored || launcherWindowRestoreScheduled || !launcherWindow || launcherWindow.isDestroyed()) return;
+      if (!['minimize', 'hide'].includes(launchWindowAction)) return;
+      launcherWindowRestoreScheduled = true;
+      setTimeout(() => {
+        launcherWindowRestoreScheduled = false;
+        if (launcherWindowRestored || !launcherWindow || launcherWindow.isDestroyed()) return;
+        if (launchWindowAction === 'minimize') launcherWindow.maximize();
+        else {
+          launcherWindow.show();
+          launcherWindow.focus();
+        }
+        launcherWindowRestored = true;
+      }, 1000);
+    };
     launcher.on('debug', msg => {
       const message = String(msg);
       if (message.includes('[MCLC]: Failed to start due to')) {
@@ -3539,13 +4492,27 @@ app.whenReady().then(() => {
     });
     launcher.on('data', msg => {
       const output = String(msg);
+      earlyProcessOutput = `${earlyProcessOutput}${output}`.slice(-12000);
+      if (!forgeLoadingWindowHidden && String(metadata.loader).toLowerCase() === 'forge' &&
+          launchWindowAction === 'hide' && /Loading ImmediateWindowProvider fmlearlywindow/i.test(output) &&
+          launcherWindow && !launcherWindow.isDestroyed()) {
+        launcherWindow.hide();
+        forgeLoadingWindowHidden = true;
+      }
       const mods = output.match(/Loading (\d+) mods:/);
       if (mods) reportLaunchProgress({ phase: 'minecraft-startup', status: `Loading ${mods[1]} mods`, percent: null });
       if (/Loading \d+ mods:/.test(output)) launchProgress.advance(92, true);
       // Recent Minecraft releases log this after creating the game window and
       // completing client startup. The older 26.2-only check left newer releases
       // (such as 26.3) showing Eclipse's loading state after Minecraft was ready.
-      if (/Game took [\d.]+ seconds to start/.test(output) || /Sound engine started/.test(output)) markMinecraftReady();
+      // These messages are emitted as soon as SDL/GLFW creates Minecraft's window,
+      // before resource and loading-screen work finishes. React here instead of
+      // waiting for later startup-complete messages, without polling or delaying launch.
+      if (/Created window using SDL video driver|Created:\s*\d+x\d+x/i.test(output)) markMinecraftWindowOpened();
+      else if (/Game took [\d.]+ seconds to start|Sound engine started/.test(output)) markMinecraftWindowOpened();
+      // Bring Eclipse back as soon as Minecraft starts its normal shutdown,
+      // even if mod/native cleanup keeps the Java process alive for a while.
+      if (/\[Render thread\/INFO\]:\s*Stopping!/.test(output)) restoreLauncherWindow();
       if (loggedMinecraftErrors < 12) {
         for (const line of output.split(/\r?\n/)) {
           if (/\/(?:ERROR|FATAL)\]|Exception in thread|\bFATAL\b/.test(line)) {
@@ -3555,41 +4522,70 @@ app.whenReady().then(() => {
         }
       }
     });
-    launcher.on('close', code => { earlyExitCode = code; });
+    launcher.on('close', code => {
+      earlyExitCode = code;
+      if (code !== 0 && earlyProcessOutput.trim()) appendLauncherLog('Minecraft early-exit output', earlyProcessOutput.trim());
+    });
     launcher.on('download-status', status => {
       launchProgress.report(status.type, status.current, status.total);
     });
     launcher.on('progress', progress => {
       launchProgress.report(progress.type, progress.task, progress.total);
     });
-    launcher.on('arguments', () => launchProgress.advance(86, true));
+    launcher.on('arguments', launchArguments => {
+      launchProgress.advance(86, true);
+      const archivePath = getStartupArchivePath(instanceDir, javaPath, launchArguments, runtimeVersion, metadata.loader);
+      if (!archivePath) return;
+      let archiveReady = false;
+      try {
+        const archiveStat = fs.statSync(archivePath);
+        archiveReady = archiveStat.isFile() && archiveStat.size > 0;
+        if (!archiveReady) fs.rmSync(archivePath, { force: true });
+      } catch {}
+      const flag = archiveReady
+        ? `-XX:SharedArchiveFile=${archivePath}`
+        : `-XX:ArchiveClassesAtExit=${archivePath}`;
+      const classpathIndex = launchArguments.findIndex(argument => argument === '-cp' || argument === '-classpath' || argument === '--class-path');
+      if (classpathIndex >= 0) {
+        launchArguments.splice(classpathIndex, 0, flag);
+        appendLauncherLog('Launch', archiveReady
+          ? `Using the saved Java class archive for ${folder}.`
+          : `Recording Java classes for a faster future launch of ${folder}.`);
+      }
+    });
 
     try {
-      // Some loader/customization setup can rewrite options.txt during preparation;
-      // re-assert the bundled pack immediately before the game reads its options.
-      await ensureEclipseEssentialsPack(event, folder, instanceDir, metadata);
       gameProcess = await launcher.launch(opts);
       if (!gameProcess || !gameProcess.pid) {
-        const detail = lastLaunchError || (earlyExitCode != null ? `Minecraft exited before opening (exit code ${earlyExitCode}).` : 'The Minecraft process could not be started.');
+        const detail = lastLaunchError || (earlyExitCode != null ? `Minecraft exited before opening (exit code ${formatProcessExitCode(earlyExitCode)}).` : 'The Minecraft process could not be started.');
         throw new Error(detail);
       }
       activeInstanceLaunches.set(folder, gameProcess);
       appendLauncherLog('Launch', `${String(metadata.name || folder)} started with PID ${gameProcess.pid}.`);
       gameProcess.once('error', error => {
         if (activeInstanceLaunches.get(folder) !== gameProcess) return;
+        gameProcessFinalized = true;
         activeInstanceLaunches.delete(folder);
         appendLauncherLog('Launch error', `[${folder}] Minecraft process error: ${error?.stack || error}`);
         const playtimeMs = playtimeSession?.stop();
+        restoreLauncherWindow();
         sendLaunchStatus(event, folder, { state: 'failed', message: error.message, playtimeMs });
       });
-      gameProcess.once('close', (code, signal) => {
+      const finalizeGameProcess = (code, signal) => {
+        if (gameProcessFinalized) return;
+        gameProcessFinalized = true;
         if (activeInstanceLaunches.get(folder) !== gameProcess) return;
         activeInstanceLaunches.delete(folder);
         const playtimeMs = playtimeSession?.stop();
-        appendLauncherLog('Launch', `${String(metadata.name || folder)} closed with ${code == null ? 'no exit code' : `exit code ${code}`}${signal ? ` (${signal})` : ''}.`);
+        appendLauncherLog('Launch', `${String(metadata.name || folder)} closed with ${code == null ? 'no exit code' : `exit code ${formatProcessExitCode(code)}`}${signal ? ` (${signal})` : ''}.`);
+        restoreLauncherWindow();
         sendLaunchStatus(event, folder, { state: 'closed', code, signal, playtimeMs });
-      });
-      if (minecraftReady) {
+      };
+      // Restore as soon as the Java process exits. 'close' waits for stdio to
+      // finish closing too, which can lag behind the actual game window exit.
+      gameProcess.once('exit', finalizeGameProcess);
+      gameProcess.once('close', finalizeGameProcess);
+      if (minecraftWindowOpened) {
         sendLaunchStatus(event, folder, {
           state: 'playing',
           playtimeMs: playtimeSession?.persistElapsed(),
@@ -3623,6 +4619,7 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  initializeAutoUpdates();
 });
 
 app.on('window-all-closed', () => {

@@ -1,4 +1,102 @@
 let instances=[];
+const ambientBackground=document.getElementById('ambientBackground');
+let launcherWindowActive=document.hasFocus();
+let quickLaunchLevel='min';
+let quickLaunchActive=false;
+const wheelScrollAnimations=new WeakMap();
+function isScrollableForWheel(element,deltaY){
+  if(!(element instanceof HTMLElement))return false;
+  if(element.scrollHeight<=element.clientHeight+1)return false;
+  const maxScroll=element.scrollHeight-element.clientHeight;
+  const projectedTop=wheelScrollAnimations.get(element)?.target??element.scrollTop;
+  return deltaY>0?projectedTop<maxScroll-1:projectedTop>1;
+}
+function findWheelScrollTarget(path,deltaY){
+  for(const node of path){
+    if(!(node instanceof HTMLElement))continue;
+    const style=getComputedStyle(node);
+    if(!['auto','scroll','overlay'].includes(style.overflowY)||node.scrollHeight<=node.clientHeight+1)continue;
+    if(isScrollableForWheel(node,deltaY))return node;
+    if(style.overscrollBehaviorY==='contain'||style.overscrollBehaviorY==='none')return null;
+  }
+  return null;
+}
+function animateWheelScroll(element,deltaY){
+  let state=wheelScrollAnimations.get(element);
+  if(!state){
+    state={target:element.scrollTop,frame:0};
+    wheelScrollAnimations.set(element,state);
+  }
+  const maxScroll=element.scrollHeight-element.clientHeight;
+  state.target=Math.max(0,Math.min(maxScroll,state.target+deltaY));
+  if(state.frame)return;
+  const step=()=>{
+    const remaining=state.target-element.scrollTop;
+    if(Math.abs(remaining)<0.6){
+      element.scrollTop=state.target;
+      state.frame=0;
+      return;
+    }
+    // Ease discrete mouse-wheel notches over a few frames; trackpads continue
+    // using Chromium's native high-resolution scrolling path.
+    element.scrollTop+=remaining*0.28;
+    state.frame=requestAnimationFrame(step);
+  };
+  state.frame=requestAnimationFrame(step);
+}
+function stopWheelScrollAnimation(element){
+  const state=wheelScrollAnimations.get(element);
+  if(state){cancelAnimationFrame(state.frame);wheelScrollAnimations.delete(element);}
+}
+document.addEventListener('wheel',event=>{
+  if(event.defaultPrevented||event.ctrlKey||event.metaKey||event.shiftKey||!event.cancelable||!event.deltaY)return;
+  const target=event.target instanceof Element?event.target:null;
+  // Keep the diagnostic viewer on native scrolling so wheel input and thumb
+  // dragging are never competing with the app-wide eased wheel animation.
+  const diagnosticLog=target?.closest('#diagnosticLog');
+  if(diagnosticLog){stopWheelScrollAnimation(diagnosticLog);return;}
+  if(target?.closest('input,textarea,select,[contenteditable="true"],[role="listbox"]'))return;
+  // Chromium reports most mouse wheels in pixels (usually 100 or 120 per
+  // notch), while trackpads emit smaller, high-resolution deltas. Leave those
+  // native events untouched to avoid adding work or fighting their momentum.
+  const coarseWheel=event.deltaMode!==WheelEvent.DOM_DELTA_PIXEL||
+    (Math.abs(event.deltaY)>=48&&Number.isInteger(event.deltaY));
+  if(!coarseWheel){
+    for(const node of event.composedPath()){
+      const state=node instanceof HTMLElement?wheelScrollAnimations.get(node):null;
+      if(state){cancelAnimationFrame(state.frame);wheelScrollAnimations.delete(node);}
+    }
+    return;
+  }
+  const path=event.composedPath();
+  const scrollable=findWheelScrollTarget(path,event.deltaY);
+  if(!scrollable)return;
+  const multiplier=event.deltaMode===WheelEvent.DOM_DELTA_LINE?16:
+    event.deltaMode===WheelEvent.DOM_DELTA_PAGE?scrollable.clientHeight:1;
+  event.preventDefault();
+  animateWheelScroll(scrollable,event.deltaY*multiplier);
+},{passive:false});
+function setLaunchQuickMode(active){
+  quickLaunchActive=Boolean(active);
+  document.body.classList.toggle('quick-launch-paused',quickLaunchActive&&quickLaunchLevel==='min');
+  document.body.classList.toggle('quick-launch-max',quickLaunchActive&&quickLaunchLevel==='max');
+  syncAmbientBackgroundPlayback();
+}
+function syncAmbientBackgroundPlayback(){
+  if(!ambientBackground)return;
+  ambientBackground.muted=true;
+  ambientBackground.volume=0;
+  const shouldPlay=launcherWindowActive&&!document.hidden&&!document.body.classList.contains('performance-mode')&&!(quickLaunchActive&&quickLaunchLevel!=='off');
+  if(shouldPlay){
+    const playback=ambientBackground.play();
+    if(playback&&typeof playback.catch==='function')playback.catch(()=>{});
+  }else ambientBackground.pause();
+}
+window.eclipse?.window?.onActivity?.(active=>{launcherWindowActive=Boolean(active);syncAmbientBackgroundPlayback();});
+window.addEventListener('focus',()=>{launcherWindowActive=true;syncAmbientBackgroundPlayback();});
+window.addEventListener('blur',()=>{launcherWindowActive=false;syncAmbientBackgroundPlayback();});
+document.addEventListener('visibilitychange',syncAmbientBackgroundPlayback);
+syncAmbientBackgroundPlayback();
 let newsItems=[];
 let profiles=[];
 let selectedProfileId=null;
@@ -9,6 +107,11 @@ let pinnedInstanceFolders=[];
 let sidebarOrder=['home','mods','profile','settings'];
 let newsEnabled=true;
 let showPlaytime=true;
+let launchAction='hide';
+let memoryAllocationMb=4096;
+let minecraftResolutionWidth=1280;
+let minecraftResolutionHeight=720;
+let minecraftFullscreen=false;
 let playtimePosition='left';
 let performanceModsEnabledByDefault=false;
 let utilityModsEnabledByDefault=false;
@@ -24,11 +127,11 @@ let deleteInstanceStage=1;
 let deletingInstance=false;
 let resetPlaytimeTarget=null;
 let resettingPlaytime=false;
+let lastAccountType='microsoft';
 let removeModTarget=null;
 let modInstallBusy=false;
 let modSearchRequestId=0;
 let modSearchDebounceTimer=null;
-let modProgressDismissTimer=null;
 let activeModsCategory='mods';
 let activeModsTab='installed';
 let installedModsCache=[];
@@ -39,6 +142,7 @@ const installedAssetCacheFolders={resourcepack:null,shader:null};
 const installedAssetCacheFailed={resourcepack:false,shader:false};
 const assetListRequestIds={resourcepack:0,shader:0};
 let installedModFilter='all';
+let installedModSort='newest';
 let installedModQuery='';
 let lastModrinthProjects=[];
 let lastModrinthInstanceInstalled=false;
@@ -51,6 +155,15 @@ let modDiscoveryExhausted=false;
 let modDiscoveryKey='';
 let modDiscoveryScrollBound=false;
 let diagnosticLogEntries=[];
+let diagnosticAutoScroll=true;
+const diagnosticLogView=document.getElementById('diagnosticLog');
+diagnosticLogView.addEventListener('pointerdown',()=>{diagnosticAutoScroll=false;stopWheelScrollAnimation(diagnosticLogView);});
+diagnosticLogView.addEventListener('mousedown',()=>{diagnosticAutoScroll=false;stopWheelScrollAnimation(diagnosticLogView);});
+diagnosticLogView.addEventListener('wheel',()=>{diagnosticAutoScroll=false;},{passive:true});
+diagnosticLogView.addEventListener('touchstart',()=>{diagnosticAutoScroll=false;},{passive:true});
+diagnosticLogView.addEventListener('keydown',event=>{
+  if(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '].includes(event.key))diagnosticAutoScroll=false;
+});
 let diagnosticReadSequence=0;
 const modsListRequests=new Map();
 let pageAnimationTimer=null;
@@ -58,6 +171,7 @@ let pageAnimationDuration=450;
 let installProgressTimer=null;
 let installingInstanceFolder=null;
 let launchingInstanceFolder=null;
+let launchingInstanceIsFirstLaunch=false;
 let playingInstanceFolder=null;
 let selectedControlsShouldAnimate=false;
 const skinUrlRequests=new Map();
@@ -86,9 +200,52 @@ let tlSkinTypingTimer=null;
 
 const animationDurations={fast:280,normal:450,relaxed:700,slow:1000,off:0};
 const sidebarPageLabels={home:'Home',mods:'Mods',profile:'Profile',settings:'Settings'};
+const legacyInstanceIconNames={
+  'ironsword445x445.png':'ironsword-emoji.png',
+  'heartlogo266x266.png':'heart-emoji.png',
+  'hardcore-heart402x402.png':'hardcore-emoji.png',
+  'hacker-head187x187.png':'hackerhead-emoji.png',
+  'golden-apple144x144.png':'goldenapple-emoji.png'
+};
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
+window.eclipse.app.version().then(version=>{$('#launcherVersion').textContent=`Eclipse v${version}`;}).catch(()=>{});
+window.eclipse.updates.onAvailable(version=>{
+  $('#updateVersion').textContent=`Eclipse v${version}`;
+  $('#updateCard').hidden=false;
+});
+window.eclipse.updates.onReady(()=>{
+  $('#updateInstallButton').disabled=false;
+  $('#updateInstallButton').textContent='Update';
+});
+function changelogInline(text){
+  return escapeHtml(text).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/__(.+?)__/g,'<strong>$1</strong>').replace(/\*(?!\s)(.+?)(?<!\s)\*/g,'<em>$1</em>').replace(/_(?!\s)(.+?)(?<!\s)_/g,'<em>$1</em>').replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+}
+function renderReleaseNotes(markdown){
+  const html=[];let paragraph=[];let list='';
+  const flushParagraph=()=>{if(paragraph.length){html.push(`<p>${paragraph.map(changelogInline).join('<br>')}</p>`);paragraph=[];}};
+  const flushList=()=>{if(list){html.push(`</${list}>`);list='';}};
+  for(const line of String(markdown||'').replace(/\r/g,'').split('\n')){
+    const heading=line.match(/^(#{1,4})\s+(.+)$/);const item=line.match(/^\s*[-*+]\s+(.+)$/);const ordered=line.match(/^\s*\d+\.\s+(.+)$/);
+    if(heading){flushParagraph();flushList();const level=Math.min(heading[1].length+1,5);html.push(`<h${level}>${changelogInline(heading[2])}</h${level}>`);}
+    else if(item||ordered){flushParagraph();const type=ordered?'ol':'ul';if(list!==type){flushList();list=type;html.push(`<${list}>`);}html.push(`<li>${changelogInline((item||ordered)[1])}</li>`);}
+    else if(line.trim()){flushList();paragraph.push(line);}else{flushParagraph();flushList();}
+  }
+  flushParagraph();flushList();return html.join('')||'<p>No release notes were provided.</p>';
+}
+window.eclipse.updates.pendingChangelog().then(changelog=>{
+  if(!changelog)return;
+  $('#updateChangelogVersion').textContent=`Version ${changelog.version}`;
+  $('#updateChangelogBody').innerHTML=changelog.unavailable?'<p>Update complete. Release notes are temporarily unavailable.</p>':renderReleaseNotes(changelog.body);
+  $('#updateChangelogDialog').hidden=false;
+}).catch(()=>{});
+$('#updateChangelogOkay').onclick=()=>$('#updateChangelogDialog').hidden=true;
+$('#updateInstallButton').disabled=true;
+$('#updateInstallButton').onclick=()=>window.eclipse.updates.install().catch(error=>showInstanceNotice(`Could not start the update: ${error.message}`));
+$('#discordCommunityLink').onclick=()=>window.eclipse.community.open('discord').catch(error=>showInstanceNotice(`Could not open Discord: ${error.message}`));
+$('#websiteCommunityLink').onclick=()=>window.eclipse.community.open('website').catch(error=>showInstanceNotice(`Could not open the Eclipse website: ${error.message}`));
+$('#reportBugDiscord').onclick=()=>window.eclipse.community.open('discord').catch(error=>showInstanceNotice(`Could not open Discord: ${error.message}`));
 
 async function init(){
   const settings=await window.eclipse.settings.get();
@@ -97,7 +254,6 @@ async function init(){
   performanceModsEnabledByDefault=settings.performanceModsEnabledByDefault===true;
   utilityModsEnabledByDefault=settings.utilityModsEnabledByDefault===true;
   tlSkinsEnabledByDefault=settings.useTLSkinsEnabledByDefault===true;
-  $('#microsoftClientId').value=settings.microsoftClientId||'';
   applySettings(settings);
   renderProfiles(settings);
   instances=await window.eclipse.instances.list();
@@ -151,8 +307,6 @@ function setupModsPage(){
     installedAssetCacheFailed.shader=false;
     updateAssetCounts();
     $('#modSearchMessage').textContent='Search Modrinth for mods compatible with the selected instance.';
-    $('#modInstallProgress').hidden=true;
-    $('#modInstallProgress').classList.remove('error','complete');
     installedModsCache=[];
     installedModsCacheFolder=null;
     installedModsCacheFailed=false;
@@ -193,6 +347,12 @@ function setupModsPage(){
     if(!button)return;
     installedModFilter=button.dataset.modFilter;
     $$('#installedModFilters [data-mod-filter]').forEach(item=>{const active=item===button;item.classList.toggle('active',active);item.setAttribute('aria-pressed',String(active));});
+    renderFilteredInstalledMods();
+  };
+  $('#installedModSort').onchange=event=>{
+    installedModSort=['newest','oldest','name-asc','name-desc'].includes(event.target.value)?event.target.value:'newest';
+    const labels={newest:'Newest first',oldest:'Oldest first','name-asc':'Name: A to Z','name-desc':'Name: Z to A'};
+    $('#installedModSortTrigger').setAttribute('aria-label',`Sort installed mods: ${labels[installedModSort]}`);
     renderFilteredInstalledMods();
   };
   $('#modResults').onclick=handleModrinthAction;
@@ -257,6 +417,7 @@ function setModsCategory(category){
   $('#openModsFolder').title=pack?'Open resource packs folder':asset?'Open shader packs folder':'Open mods folder';
   $('#openModsFolder').setAttribute('aria-label',pack?'Open selected instance resource packs folder':asset?'Open selected instance shader packs folder':'Open selected instance mods folder');
   $('#installedModFilters').hidden=asset;
+  $('.installed-mod-sort').hidden=asset;
   $('#installedModSearch').value='';
   installedModQuery='';
   $('#modSearch').value='';
@@ -411,7 +572,7 @@ function renderInstalledAssets(assetType,installed=true){
     const label=assetType==='resourcepack'?'Resource pack':'Shader pack';
     const size=asset.size?`${(asset.size/1024/1024).toFixed(1)} MB`:'';
     const fallback=assetType==='resourcepack'?'▧':'✧';
-    const icon=asset.icon?`<img src="${escapeHtml(asset.icon)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${fallback}</span>`:`<span>${fallback}</span>`;
+    const icon=asset.icon?`<img src="${escapeHtml(asset.icon)}" alt="" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${fallback}</span>`:`<span>${fallback}</span>`;
     const builtIn=asset.builtIn?'<span class="mod-built-in">Built-in</span>':'';
     const remove=asset.builtIn?'':`<button class="mod-action-button remove" type="button" data-asset-remove="${escapeHtml(assetType)}" data-file-name="${escapeHtml(asset.fileName)}" data-asset-name="${escapeHtml(asset.name)}" data-is-directory="${Boolean(asset.isDirectory)}">Remove</button>`;
     return `<article class="mod-card installed-asset-card"><div class="mod-card-icon asset-icon${asset.icon?'':' no-mod-icon'}">${icon}</div><div class="mod-card-copy"><div class="mod-card-title-row"><h3>${escapeHtml(asset.name)}</h3><span class="mod-platform-tag">${label}</span>${builtIn}</div><p>${escapeHtml(asset.description||'No description is available.')}</p><div class="mod-card-meta">${size?`<span>${size}</span>`:''}<code>${escapeHtml(asset.fileName)}</code></div></div>${remove}</article>`;
@@ -452,12 +613,18 @@ function renderFilteredInstalledMods(){
     list.innerHTML=`<div class="mod-empty-card"><span class="mod-empty-icon">⌕</span><h3>${escapeHtml(message)}</h3><p>Change the search or choose another filter.</p></div>`;
     return;
   }
+  filtered.sort((a,b)=>{
+    if(installedModSort==='name-asc')return String(a.name||a.baseName).localeCompare(String(b.name||b.baseName),undefined,{sensitivity:'base'});
+    if(installedModSort==='name-desc')return String(b.name||b.baseName).localeCompare(String(a.name||a.baseName),undefined,{sensitivity:'base'});
+    const dateOrder=(Number(b.modifiedAt)||0)-(Number(a.modifiedAt)||0);
+    return (installedModSort==='oldest'?-dateOrder:dateOrder)||String(a.name||a.baseName).localeCompare(String(b.name||b.baseName),undefined,{sensitivity:'base'});
+  });
   list.innerHTML=filtered.map(renderInstalledModCard).join('');
 }
 
 function renderInstalledModCard(mod){
   const initial=escapeHtml((mod.name||'?').slice(0,1).toUpperCase());
-  const icon=mod.icon?`<img src="${escapeHtml(mod.icon)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${initial}</span>`:`<span>${initial}</span>`;
+  const icon=mod.icon?`<img src="${escapeHtml(mod.icon)}" alt="" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${initial}</span>`:`<span>${initial}</span>`;
   const status=mod.enabled?'<span class="mod-state enabled">Enabled</span>':'<span class="mod-state disabled">Disabled</span>';
   const sourceTag=mod.modrinthProjectId?'<span class="mod-source-tag">Installed from Modrinth</span>':mod.builtIn?'':'<span class="mod-source-tag manual">Added manually</span>';
   const toggleLabel=`${mod.enabled?'Disable':'Enable'} ${mod.name}`;
@@ -482,10 +649,20 @@ async function handleInstalledModAction(event){
   }
   button.disabled=true;
   try{
-    const result=await window.eclipse.mods.setEnabled(folder,button.dataset.fileName,button.dataset.enabled!=='true');
-    installedModsCache=result.mods;
+    const previousFileName=button.dataset.fileName;
+    const result=await window.eclipse.mods.setEnabled(folder,previousFileName,button.dataset.enabled!=='true');
+    const mod=installedModsCache.find(item=>item.fileName===previousFileName);
+    if(!mod){await refreshInstalledMods();return;}
+    mod.fileName=result.fileName;
+    mod.enabled=result.enabled;
     updateAssetCounts();
-    renderFilteredInstalledMods();
+    const card=button.closest('.installed-mod-card');
+    const stateMatches=installedModFilter==='all'||(installedModFilter==='enabled'?mod.enabled:!mod.enabled);
+    const haystack=`${mod.name||''} ${mod.id||''} ${mod.baseName||''} ${mod.description||''}`.toLocaleLowerCase();
+    if(card){
+      if(stateMatches&&haystack.includes(installedModQuery))card.outerHTML=renderInstalledModCard(mod);
+      else card.remove();
+    }else renderFilteredInstalledMods();
   }catch(error){showInstanceNotice(`Could not change mod state: ${error.message}`);button.disabled=false;}
 }
 
@@ -510,7 +687,7 @@ async function confirmRemoveMod(){
       updateAssetCounts();
       renderInstalledAssets(target.assetType,result.installed);
     }else{
-      installedModsCache=result.mods;
+      installedModsCache=installedModsCache.filter(mod=>mod.fileName!==target.fileName);
       updateAssetCounts();
       renderFilteredInstalledMods();
     }
@@ -672,7 +849,7 @@ function renderModrinthResults(){
 
 function renderModrinthCard(project,instanceInstalled){
   const initial=escapeHtml((project.title||'?').slice(0,1).toUpperCase());
-  const icon=project.icon?`<img src="${escapeHtml(project.icon)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${initial}</span>`:`<span>${initial}</span>`;
+  const icon=project.icon?`<img src="${escapeHtml(project.icon)}" alt="" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="mod-icon-fallback" hidden>${initial}</span>`:`<span>${initial}</span>`;
   const downloads=Intl.NumberFormat().format(project.downloads);
   const loader=instances.find(item=>item.folder===$('#modInstance').value)?.loader||'Fabric';
   const isMod=activeModsCategory==='mods';
@@ -707,64 +884,41 @@ async function handleModrinthAction(event){
   const category=activeModsCategory;
   const projectId=assetType?button.dataset.assetProjectId:button.dataset.projectId;
   modInstallBusy=true;
-  clearTimeout(modProgressDismissTimer);
   $$('#modResults [data-project-id], #modResults [data-asset-project-id]').forEach(item=>{item.disabled=true;item.textContent='Installing…';});
-  $('#modInstallProgress').hidden=false;
-  $('#modInstallProgress').classList.remove('error','complete');
-  $('#modInstallProgressLabel').textContent=assetType?`Checking compatible ${assetType==='resourcepack'?'resource pack':'shader'} version…`:'Checking mod version and required dependencies…';
-  $('#modInstallProgressPercent').textContent='';
-  $('#modInstallProgressFill').style.width='4%';
   try{
     const result=assetType
       ?await window.eclipse.mods.installAsset(folder,projectId,assetType)
       :await window.eclipse.mods.install(folder,projectId);
     if(folder===$('#modInstance').value){
       const installedCount=result.installedCount||0;
-      $('#modInstallProgressLabel').textContent=assetType
-        ?installedCount?`${assetType==='resourcepack'?'Resource pack':'Shader pack'} installed`:'This asset is already installed'
-        :installedCount?`Installed ${installedCount} mod${installedCount===1?'':'s'} including required dependencies`:'All required mods were already installed';
-      $('#modInstallProgressPercent').textContent='Done';
-      $('#modInstallProgressFill').style.width='100%';
-      $('#modInstallProgress').classList.add('complete');
-      if(assetType)await refreshInstalledAssets(assetType);
-      else await refreshInstalledMods();
-      modProgressDismissTimer=setTimeout(()=>{$('#modInstallProgress').hidden=true;},1000);
-      showInstanceNotice(assetType
-        ?installedCount?`${assetType==='resourcepack'?'Resource pack':'Shader pack'} installed successfully.`:'This asset is already installed.'
-        :installedCount?'Mod and required dependencies installed successfully.':'This mod and its required dependencies are already installed.');
+      if(assetType){
+        await refreshInstalledAssets(assetType);
+      }else if(result.mods?.length){
+        const additions=result.mods;
+        const existingFiles=new Set(installedModsCache.map(mod=>mod.fileName));
+        installedModsCache.push(...additions.filter(mod=>!existingFiles.has(mod.fileName)));
+        installedModsCacheFolder=folder;
+        installedModsCacheFailed=false;
+        updateAssetCounts();
+        if(activeModsTab==='installed')renderFilteredInstalledMods();
+      }
     }
   }catch(error){
     if(folder===$('#modInstance').value){
-      $('#modInstallProgress').classList.add('error');
-      $('#modInstallProgressLabel').textContent=error.message||'Mod installation failed.';
-      $('#modInstallProgressPercent').textContent='';
       showInstanceNotice(`Could not install ${assetType==='resourcepack'?'resource pack':assetType==='shader'?'shader pack':'mod'}: ${error.message}`);
     }
   }finally{
     modInstallBusy=false;
-    if(folder===$('#modInstance').value&&activeModsTab==='modrinth')await searchModrinthAfterInstall(folder,category);
-    if(activeModsTab==='installed'&&folder===$('#modInstance').value)refreshCurrentInstalledContent();
+    if(folder===$('#modInstance').value&&activeModsTab==='modrinth'&&activeModsCategory===category)renderCurrentModrinthView();
+    if(activeModsTab==='installed'&&folder===$('#modInstance').value){
+      if(category==='mods')renderFilteredInstalledMods();
+      else refreshCurrentInstalledContent();
+    }
   }
 }
 
-async function searchModrinthAfterInstall(folder,category){
-  if(activeModsTab!=='modrinth'||folder!==$('#modInstance').value||activeModsCategory!==category)return;
-  if($('#modSearch').value.trim())await searchModrinth();
-  else renderModDiscoveryResults();
-}
-
-function updateModInstallProgress(progress){
-  if(progress.folder!==$('#modInstance').value)return;
-  const panel=$('#modInstallProgress');
-  panel.hidden=false;
-  panel.classList.toggle('error',Boolean(progress.error));
-  panel.classList.toggle('complete',Boolean(progress.complete));
-  $('#modInstallProgressLabel').textContent=progress.status||'Installing mods…';
-  $('#modInstallProgressPercent').textContent=Number.isFinite(progress.percent)?`${progress.percent}%`:'';
-  if(Number.isFinite(progress.percent))$('#modInstallProgressFill').style.width=`${Math.max(0,Math.min(100,progress.percent))}%`;
-}
-
 function applySettings(s){
+  lastAccountType=s.lastAccountType==='offline'?'offline':'microsoft';
   const name=s.profile?.name||'Steve';
   $('#accountName').textContent=name;
   const crown=name==='Arman_Legend'?'<svg class="name-crown" viewBox="0 0 20 18" aria-label="Crown" role="img"><path d="M2 6.5 5.2 9l2-5 2.8 4.2L12.8 4l2 5L18 6.5l-1.7 8H3.7L2 6.5Z"/><path d="M4.5 17h11"/></svg>':'';
@@ -776,14 +930,25 @@ function applySettings(s){
     const url = localFileUrl(s.background);
     setBackgroundImage(url);
   }
-  $('#theme').value=s.theme||'dark';
-  syncCustomDropdown('theme');
   $('#animationSpeed').value=s.animationSpeed||'normal';
   syncCustomDropdown('animationSpeed');
   setAnimationSpeed(s.animationSpeed||'normal');
   $('#playAnimationSpeed').value=s.playAnimationSpeed||'relaxed';
   syncCustomDropdown('playAnimationSpeed');
   setPlayAnimationSpeed(s.playAnimationSpeed||'relaxed');
+  launchAction=s.launchAction||'hide';
+  $('#launchAction').value=launchAction;
+  syncCustomDropdown('launchAction');
+  memoryAllocationMb=Number(s.memoryAllocationMb)||4096;
+  $('#memoryAllocation').max=String(Number(s.memoryAllocationMaxMb)||4096);
+  $('#memoryAllocation').value=String(memoryAllocationMb);
+  renderMemoryAllocationValue();
+  minecraftResolutionWidth=Number(s.minecraftResolutionWidth)||1280;
+  minecraftResolutionHeight=Number(s.minecraftResolutionHeight)||720;
+  $('#minecraftResolutionWidth').value=String(minecraftResolutionWidth);
+  $('#minecraftResolutionHeight').value=String(minecraftResolutionHeight);
+  minecraftFullscreen=s.minecraftFullscreen===true;
+  $('#minecraftFullscreen').checked=minecraftFullscreen;
   showPlaytime=s.showPlaytime!==false;
   $('#showPlaytimeToggle').checked=showPlaytime;
   playtimePosition=s.playtimePosition==='right'?'right':'left';
@@ -798,9 +963,39 @@ function applySettings(s){
   $('#showQuickLaunchToggle').checked=s.showQuickLaunch!==false;
   $('#quickLaunchPanel').hidden=s.showQuickLaunch===false;
   applySidebarOrder(s.sidebarOrder||sidebarOrder);
-  document.body.classList.toggle('light',s.theme==='light');
+  document.body.classList.remove('light');
+  applyAppearanceSettings(s);
+  $('#quickLaunchLevel').value=s.quickLaunchLevel||'min';
+  syncCustomDropdown('quickLaunchLevel');
   if(currentBackgroundImageUrl)setBackgroundImage(currentBackgroundImageUrl);
   if(s.profile?.status) updateStatusUI(s.profile.status);
+}
+
+function applyAppearanceSettings(settings={}){
+  const accent=/^#[0-9a-f]{6}$/i.test(settings.accentColor)?settings.accentColor:'#963cff';
+  const glass=Math.max(0,Math.min(100,Number(settings.glassStrength??62)));
+  const blur=Math.max(0,Math.min(32,Number(settings.backgroundBlur??16)));
+  const performance=settings.performanceMode===true;
+  quickLaunchLevel=['off','min','max'].includes(settings.quickLaunchLevel)?settings.quickLaunchLevel:'min';
+  const surfaceAlpha=(1-glass/100*.82).toFixed(2);
+  document.body.style.setProperty('--eclipse-accent',performance?'#963cff':accent);
+  document.body.style.setProperty('--glass-alpha',surfaceAlpha);
+  document.body.style.setProperty('--glass-blur',`${performance?0:blur}px`);
+  document.body.classList.toggle('performance-mode',performance);
+  $('#glassStrength').value=String(glass);
+  $('#glassStrengthValue').textContent=`${glass}%`;
+  $('#backgroundBlur').value=String(blur);
+  $('#backgroundBlurValue').textContent=`${blur} px`;
+  $('#customAccentColor').value=accent;
+  $('#performanceMode').checked=performance;
+  $('#customAccentColor').disabled=performance;
+  $('#glassStrength').disabled=performance;
+  $('#backgroundBlur').disabled=performance;
+  $$('[data-accent]').forEach(button=>button.disabled=performance);
+  $$('[data-accent]').forEach(button=>button.classList.toggle('selected',!performance&&button.dataset.accent.toLowerCase()===accent.toLowerCase()));
+  $('#customAccentColor').closest('.custom-accent').classList.toggle('selected',!performance&&![...$$('[data-accent]')].some(button=>button.dataset.accent.toLowerCase()===accent.toLowerCase()));
+  $('#appearanceControls').classList.toggle('locked',performance);
+  syncAmbientBackgroundPlayback();
 }
 
 function renderProfiles(settings){
@@ -977,9 +1172,11 @@ function closeRemoveProfileDialog(){
 }
 
 function showRenameInstanceDialog(instance){
+  if(instance?.official)return;
   renameInstanceTarget=instance;
-  renameInstanceIcon=String(instance.icon||'');
+  renameInstanceIcon=normalizeInstanceIcon(instance.icon);
   $('#renameInstanceInput').value=instance.name||instance.folder;
+  $('#renameInstanceGroup').value=instance.group||'';
   $$('#renameInstanceIcons [data-icon]').forEach(button=>button.classList.toggle('active',button.dataset.icon===renameInstanceIcon));
   $('#renameInstanceError').hidden=true;
   $('#renameInstanceError').textContent='';
@@ -1154,11 +1351,14 @@ function showAccountMessage(message,isError=false){
   node.classList.toggle('error',Boolean(isError));
 }
 
-function setAccountType(type){
-  $$('[data-account-type]').forEach(button=>button.classList.toggle('active',button.dataset.accountType===type));
-  $('#offlineAccountForm').hidden=type!=='offline';
-  $('#microsoftAccountForm').hidden=type!=='microsoft';
+function setAccountType(type,persist=true){
+  const selected=type==='offline'?'offline':'microsoft';
+  lastAccountType=selected;
+  $$('[data-account-type]').forEach(button=>button.classList.toggle('active',button.dataset.accountType===selected));
+  $('#offlineAccountForm').hidden=selected!=='offline';
+  $('#microsoftAccountForm').hidden=selected!=='microsoft';
   showAccountMessage('');
+  if(persist)window.eclipse.settings.set({lastAccountType:selected}).catch(error=>showAccountMessage(`Could not save this preference: ${error.message}`,true));
 }
 
 function localFileUrl(filePath){
@@ -1191,6 +1391,7 @@ function updateStatusUI(status){
   dot.className=`status-dot status-${safeStatus}`;
   dot.setAttribute('aria-hidden','true');
   $('#accountState').replaceChildren(dot,document.createTextNode(label));
+  $$('[data-status]').forEach(option=>option.setAttribute('aria-pressed',String(option.dataset.status===safeStatus)));
 }
 
 function setAnimationSpeed(speed='normal'){
@@ -1221,88 +1422,6 @@ function applySidebarOrder(order){
   $$('.sidebar-order-row button').forEach(button=>button.onclick=()=>moveSidebarPage(button.dataset.orderPage,Number(button.dataset.orderMove)));
 }
 
-function detectFabricModConflicts(log){
-  const rootVersions=new Map();
-  for(const match of log.matchAll(/ROOT_FORCELOAD_SINGLE\s+([^\s,]+)\s+([^\s,}\]]+)/gi))rootVersions.set(match[1].toLowerCase(),match[2].replace(/[!,;]+$/,''));
-  const conflicts=[];
-  const seen=new Set();
-  const add=(firstName,firstId,firstVersion,secondName,secondId,secondVersion)=>{
-    const key=[firstId,firstVersion,secondId,secondVersion].join('|').toLowerCase();
-    if(seen.has(key))return;
-    seen.add(key);
-    conflicts.push({firstName:firstName||firstId,firstId,firstVersion,secondName:secondName||secondId,secondId,secondVersion});
-  };
-  const named=/Mod '([^']+)' \(([^)]+)\) ([^\s]+) is incompatible with any version of mod '([^']+)' \(([^)]+)\), yet a conflicting version is present: ([^!\s]+)!?/gi;
-  for(const match of log.matchAll(named))add(match[1],match[2],match[3],match[4],match[5],match[6]);
-  const raw=/NEG_HARD_DEP\s+([^\s,]+)\s+([^\s,]+)\s+\{breaks\s+([^\s@,]+)\s+@\s+\[\*\]\}/gi;
-  for(const match of log.matchAll(raw))add('',match[1],match[2],'',match[3],rootVersions.get(match[3].toLowerCase())||'');
-  return conflicts;
-}
-
-function removeOptionalMixinWarnings(log){
-  const lines=String(log||'').split(/\r?\n/);
-  return lines.filter(line=>{
-    if(/@Mixin target .* was not found.*?\.mixins\.json/i.test(line))return false;
-    // Fabric logs failed optional class probes at WARN level while mods check
-    // whether integrations such as Mod Menu, JEI, or Starlight are installed.
-    // A genuinely required class/mixin failure is reported separately as an
-    // ERROR (or in a crash report), so these probes must not trigger a diagnosis.
-    if(/\[.*\/WARN\].*Error loading class:\s*[\w/$.-]+.*ClassNotFoundException/i.test(line))return false;
-    return true;
-  }).join('\n');
-}
-
-function diagnoseLogText(text, source){
-  let log=String(text||'');
-  if(source==='launcher'){
-    const attempts=[...log.matchAll(/\[Launch\]\s+Starting [^\r\n]*/g)];
-    if(attempts.length)log=log.slice(attempts[attempts.length-1].index);
-  }
-  log=removeOptionalMixinWarnings(log);
-  const conflicts=detectFabricModConflicts(log);
-  if(conflicts.length){
-    const descriptions=conflicts.map(item=>{
-      const firstLabel=item.firstName.toLowerCase()===item.firstId.toLowerCase()?item.firstId:`${item.firstName} (${item.firstId})`;
-      const secondLabel=item.secondName.toLowerCase()===item.secondId.toLowerCase()?item.secondId:`${item.secondName} (${item.secondId})`;
-      return `• ${firstLabel} ${item.firstVersion} conflicts with ${secondLabel}${item.secondVersion?` ${item.secondVersion}`:''}.`;
-    });
-    const fixLine=log.split(/\r?\n/).find(line=>/\bFix:\s*(?:add|remove|replace)/i.test(line));
-    return [{title:'Fabric identified conflicting mods',fix:`${descriptions.join('\n')}\nTry removing one of the listed mods, or update/downgrade one until the pair is compatible. The Minecraft version and Fabric Loader version must also match.`,evidence:fixLine?.trim().slice(0,500)||''}];
-  }
-  if(/Mod resolution failed|Incompatible mods found!/i.test(log)){
-    return [{title:source==='launcher'?'Minecraft could not resolve its mod set':'Fabric could not resolve this mod set',fix:source==='launcher'?'This launcher log records a failed Minecraft start. Open the matching instance’s latest.log or crash report to see which exact mods conflict.':'The log confirms a mod-resolution failure but does not include a complete conflict pair. Check the nearby “Reason” and “Fix” lines, then remove or change one of the named mods.'}];
-  }
-  const rules=[
-    {pattern:/MixinApplyError|MixinTransformerError|Critical injection failure|InjectionError/i,title:'A mod failed to apply its game changes',fix:'This usually means a mod is outdated or conflicts with another mod. Update the named mod and its dependencies, then remove or update other mods mentioned near this error.'},
-    {pattern:/UnsupportedClassVersionError|class file version \d+\.\d+/i,title:'A mod requires a different Java version',fix:'Use the Java runtime recommended for this Minecraft version. Eclipse installs its runtime automatically; if you selected a custom Java executable, switch back to the installed runtime.'},
-    {pattern:/OutOfMemoryError|Could not reserve enough space|GC overhead limit exceeded/i,title:'Minecraft ran out of memory',fix:'Close other memory-heavy apps and remove large or conflicting mods. If the problem continues, use a lighter mod set or allocate more memory to Minecraft.'},
-    {pattern:/NoSuchMethodError|NoSuchFieldError|NoClassDefFoundError|ClassNotFoundException/i,title:'A mod or dependency is missing or incompatible',fix:'Update the named mod and its required dependencies for the exact Minecraft version and loader. If it began after adding a mod, remove that mod and try again.'},
-    {pattern:/ModLoadingException|Failed to load mod|Error loading mods|Failed to load config/i,title:'A mod could not load',fix:'Look for the mod name on this line and nearby lines. Check that it matches this instance’s Minecraft version and loader, then update it or remove it.'},
-    {pattern:/UnknownHostException|ConnectException|Connection timed out|Read timed out|Name or service not known|ENOTFOUND|ECONNRESET/i,title:'A network connection failed',fix:'Check your internet connection and try again. If this appears while joining a server, check that the server is online and reachable.'},
-    {pattern:/ENOENT|The system cannot find the file specified|Could not find or load main class|Could not find main class/i,title:'A required file or Java executable is missing',fix:'Try installing the instance again. If Eclipse cannot find Java, close and reopen the launcher so it can repair the bundled runtime; check whether antivirus quarantined a game file.'},
-    {pattern:/The game crashed whilst|Description:.*Exception|Exception in thread "main"/i,title:'Minecraft crashed during startup',fix:'Use the error lines below this message to identify the mod or runtime involved. Update or remove the named mod, then relaunch. If no mod is named, reinstall this instance.'}
-  ];
-  const findings=[];
-  const lines=log.split(/\r?\n/);
-  for(const rule of rules){
-    const match=rule.pattern.exec(log);
-    if(!match)continue;
-    const line=log.slice(0,match.index).split(/\r?\n/).length;
-    const evidence=lines.slice(Math.max(0,line-2),Math.min(lines.length,line+1)).join(' ').trim().slice(0,260);
-    findings.push({title:rule.title,fix:rule.fix,evidence});
-    if(findings.length>=4)break;
-  }
-  if(findings.length)return findings;
-  if(!log.trim())return [{title:'No log content yet',fix:'Refresh after launching the game. Minecraft logs appear once that instance has started.',neutral:true}];
-  if(source==='launcher'&&!/error|exception|failed|crash|fatal/i.test(log))return [{title:'No actionable launcher problem found',fix:'If Minecraft failed to start, select that instance’s latest.log or the newest crash report.',neutral:true}];
-  return [{title:'No actionable issue detected',fix:'No recognized crash or launch failure was found in this log. Some Minecraft warnings are optional features or harmless notices; the log remains available below if you need to share it.',neutral:true}];
-}
-
-function renderLogDiagnosis(log){
-  const findings=diagnoseLogText(log.text,log.source);
-  $('#diagnosticFindings').innerHTML=findings.map(finding=>`<article class="diagnostic-finding${finding.neutral?' neutral':''}"><h3>${escapeHtml(finding.title)}</h3><p>${escapeHtml(finding.fix)}</p>${finding.evidence?`<div class="diagnostic-evidence">${escapeHtml(finding.evidence)}</div>`:''}</article>`).join('');
-}
-
 async function refreshDiagnosticLogs(preserveSelection=true){
   const select=$('#diagnosticLogSelect');
   const previous=preserveSelection?select.value:'';
@@ -1320,14 +1439,20 @@ async function refreshDiagnosticLogs(preserveSelection=true){
       $('#diagnosticLogSelectTrigger').disabled=true;
       syncCustomDropdown('diagnosticLogSelect');
       $('#diagnosticLog').textContent='No logs are available yet.';
-      $('#diagnosticFindings').textContent='Launcher diagnostics will appear here after Eclipse records an error. Minecraft logs appear after you launch an instance.';
       $('#copyDiagnosticLog').disabled=true;
       $('#diagnosticLogStatus').textContent='No log files found.';
       return;
     }
     for(const entry of diagnosticLogEntries){
       const option=document.createElement('option');option.value=entry.id;option.textContent=entry.label;select.append(option);
-      const menuOption=document.createElement('button');menuOption.type='button';menuOption.className='custom-select-option';menuOption.dataset.value=entry.id;menuOption.setAttribute('role','option');menuOption.setAttribute('aria-selected','false');menuOption.tabIndex=-1;menuOption.textContent=entry.label;menu.append(menuOption);
+      const menuOption=document.createElement('button');menuOption.type='button';menuOption.className='custom-select-option';menuOption.dataset.value=entry.id;menuOption.setAttribute('role','option');menuOption.setAttribute('aria-selected','false');menuOption.tabIndex=-1;menuOption.textContent=entry.label;
+      if(entry.source==='crash'){
+        const row=document.createElement('div');row.className='diagnostic-log-option-row';row.setAttribute('role','presentation');
+        const deleteButton=document.createElement('button');deleteButton.type='button';deleteButton.className='diagnostic-crash-delete-option';deleteButton.setAttribute('aria-label',`Delete ${entry.label}`);deleteButton.title='Delete crash report';
+        deleteButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5"/></svg>';
+        deleteButton.onclick=event=>{event.stopPropagation();deleteCrashReportFromDropdown(entry.id);};
+        row.append(menuOption,deleteButton);menu.append(row);
+      }else menu.append(menuOption);
     }
     $('#diagnosticLogSelectTrigger').disabled=false;
     select.value=diagnosticLogEntries.some(entry=>entry.id===previous)?previous:diagnosticLogEntries[0].id;
@@ -1335,27 +1460,26 @@ async function refreshDiagnosticLogs(preserveSelection=true){
     await readSelectedDiagnosticLog();
   }catch(error){
     $('#diagnosticLogStatus').textContent=`Could not list logs: ${error.message}`;
-    $('#diagnosticFindings').textContent='The diagnostic log list could not be read.';
   }finally{refresh.disabled=false;}
 }
 
 async function readSelectedDiagnosticLog(){
   const id=$('#diagnosticLogSelect').value;
   const sequence=++diagnosticReadSequence;
-  if(!id){$('#diagnosticLog').textContent='No log selected.';$('#copyDiagnosticLog').disabled=true;return;}
-  $('#diagnosticLog').textContent='Reading log…';
-  $('#diagnosticFindings').textContent='Checking this log for common causes…';
+  const logView=diagnosticLogView;
+  if(!id){logView.textContent='No log selected.';if(diagnosticAutoScroll)logView.scrollTop=logView.scrollHeight;$('#copyDiagnosticLog').disabled=true;return;}
+  if(!logView.textContent||logView.textContent==='No log selected.')logView.textContent='Reading log…';
   try{
     const log=await window.eclipse.diagnostics.read(id);
     if(sequence!==diagnosticReadSequence)return;
-    $('#diagnosticLog').textContent=`${log.truncated?'[Showing the most recent 2 MB of this log.]\n\n':''}${log.text}`;
+    logView.textContent=`${log.truncated?'[Showing the most recent 2 MB of this log.]\n\n':''}${log.text}`;
+    if(diagnosticAutoScroll)logView.scrollTop=logView.scrollHeight;
     $('#copyDiagnosticLog').disabled=!log.text;
-    renderLogDiagnosis(log);
     $('#diagnosticLogStatus').textContent=`${log.label} · ${(log.size/1024).toFixed(1)} KB · Updated ${new Date(log.modified).toLocaleString()}`;
   }catch(error){
     if(sequence!==diagnosticReadSequence)return;
-    $('#diagnosticLog').textContent=`Could not read this log: ${error.message}`;
-    $('#diagnosticFindings').textContent='Refresh the available logs and select it again.';
+    logView.textContent=`Could not read this log: ${error.message}`;
+    if(diagnosticAutoScroll)logView.scrollTop=logView.scrollHeight;
     $('#copyDiagnosticLog').disabled=true;
   }
 }
@@ -1512,7 +1636,7 @@ function setupAppTooltips(){
   prepare(document.body);
   document.addEventListener('pointerover',event=>{
     const target=event.target.closest?.('[data-tooltip],[title]');
-    if(target)show(target);
+    if(target&&target!==active)show(target);
   });
   document.addEventListener('pointerout',event=>{
     if(active&&event.target.closest?.('[data-tooltip]')===active&&!active.contains(event.relatedTarget))hide();
@@ -1536,14 +1660,16 @@ function renderInstances(){
     return (b.lastPlayed||0)-(a.lastPlayed||0);
   });
   if(selectedInstanceFolder&&!instances.some(instance=>instance.folder===selectedInstanceFolder)) selectedInstanceFolder=null;
-  $('#instances').innerHTML=list.map(i=>`
+  list.sort((a,b)=>String(a.group||'').localeCompare(String(b.group||''),undefined,{sensitivity:'base'})||(sort==='name'?(a.name||'').localeCompare(b.name||''):sort==='version'?(a.version||'').localeCompare(b.version||''):(b.lastPlayed||0)-(a.lastPlayed||0)));
+  let previousGroup=null;
+  $('#instances').innerHTML=list.map(i=>{const group=String(i.group||'').trim();const heading=group&&group!==previousGroup?`<h3 class="instance-group-heading">${escapeHtml(group)}</h3>`:'';previousGroup=group;return `${heading}
       <article class="instance${i.folder===selectedInstanceFolder?' selected':''}" data-folder="${escapeHtml(i.folder)}" role="group" tabindex="0" aria-label="${escapeHtml(i.name||i.folder)} instance">
       ${i.image?`<img src="${escapeHtml(i.image)}" alt="">`:''}
       <div class="instance-body">
         <div class="instance-heading"><h3><span class="instance-name-label">${escapeHtml(i.name||i.folder)}</span>${instanceIconMarkup(i)}</h3>${instanceActionsMarkup(i)}</div>
         ${instanceMetaMarkup(i)}
       </div>
-    </article>`).join('') || `<div class="panel">No instances found.</div>`;
+    </article>`;}).join('') || `<div class="panel">No instances found.</div>`;
   $$('.instance[data-folder]').forEach(card=>{
     card.onclick=event=>{if(!event.target.closest('.instance-actions button'))selectInstance(card.dataset.folder);};
     card.onkeydown=event=>{if(event.target===card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectInstance(card.dataset.folder);}};
@@ -1551,7 +1677,7 @@ function renderInstances(){
     if(renameButton)renameButton.onclick=event=>{
       event.stopPropagation();
       const instance=instances.find(item=>item.folder===card.dataset.folder);
-      if(instance)showRenameInstanceDialog(instance);
+      if(instance&&!instance.official)showRenameInstanceDialog(instance);
     };
     card.querySelector('.instance-pin').onclick=event=>{
       event.stopPropagation();
@@ -1571,23 +1697,46 @@ function instanceActionsMarkup(instance){
   const name=escapeHtml(instance.name||instance.folder);
   const pinned=pinnedInstanceFolders.includes(instance.folder);
   const deleteButton=instance.official&&instance.installed===false?'':`<button class="instance-delete" type="button" aria-label="Delete files for ${name}" title="Delete instance files"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4m2.5 0-.6 9.5H4.1L3.5 4m3 2v5m3-5v5"/></svg></button>`;
-  return `<span class="instance-actions"><span class="instance-action-buttons"><button class="instance-pin${pinned?' pinned':''}" type="button" aria-label="${pinned?'Unpin':'Pin'} ${name} in Quick Launch" title="${pinned?'Unpin instance':'Pin to Quick Launch'}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5h6l-.7 3 2.2 2.2v1H8.5v4.8l-.5.8-.5-.8V8.7H3.5v-1l2.2-2.2L5 2.5Z"/></svg></button><button class="instance-rename" type="button" aria-label="Rename ${name}" title="Rename instance"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m2.5 11.5-.7 3 3-.7 8.1-8.1a1.63 1.63 0 0 0-2.3-2.3l-8.1 8.1Z"/><path d="m9.8 4.3 2.3 2.3"/></svg></button>${deleteButton}</span><span class="instance-install-state ${installingInstanceFolder===instance.folder?'install-state-installing':instance.installed===false?'install-state-uninstalled':'install-state-installed'}">${installingInstanceFolder===instance.folder?'Installing':instance.installed===false?'Not installed':'Installed'}</span></span>`;
+  const renameButton=instance.official?'':`<button class="instance-rename" type="button" aria-label="Rename ${name}" title="Rename instance"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m2.5 11.5-.7 3 3-.7 8.1-8.1a1.63 1.63 0 0 0-2.3-2.3l-8.1 8.1Z"/><path d="m9.8 4.3 2.3 2.3"/></svg></button>`;
+  return `<span class="instance-actions"><span class="instance-action-buttons"><button class="instance-pin${pinned?' pinned':''}" type="button" aria-label="${pinned?'Unpin':'Pin'} ${name} in Quick Launch" title="${pinned?'Unpin instance':'Pin to Quick Launch'}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5h6l-.7 3 2.2 2.2v1H8.5v4.8l-.5.8-.5-.8V8.7H3.5v-1l2.2-2.2L5 2.5Z"/></svg></button>${renameButton}${deleteButton}</span><span class="instance-install-state ${installingInstanceFolder===instance.folder?'install-state-installing':instance.installed===false?'install-state-uninstalled':'install-state-installed'}">${installingInstanceFolder===instance.folder?'Installing':instance.installed===false?'Not installed':'Installed'}</span></span>`;
 }
 
 function instanceIconMarkup(instance){
-  const icon=String(instance.icon||'');
-  const allowed=['ironsword445x445.png','heartlogo266x266.png','hardcore-heart402x402.png','hacker-head187x187.png','golden-apple144x144.png'];
+  const icon=normalizeInstanceIcon(instance.icon);
+  const allowed=['book-emoji.png','diamond-emoji.png','emerald-emoji.png','enderpearl-emoji.png','goldenapple-emoji.png','hackerhead-emoji.png','hardcore-emoji.png','heart-emoji.png','ironsword-emoji.png','picaxe-emoji.png'];
   const identity=String(instance.folder||'').toLowerCase();
-  const selected=allowed.includes(icon)?icon:(instance.official&&identity.includes('pvp')?'ironsword445x445.png':instance.official&&identity.includes('survival')?'heartlogo266x266.png':'');
+  const selected=allowed.includes(icon)?icon:(instance.official&&identity.includes('pvp')?'ironsword-emoji.png':instance.official&&identity.includes('survival')?'heart-emoji.png':'');
   if(!selected)return '';
-  const cls=selected.startsWith('iron')?'instance-sword-icon':selected.startsWith('heartlogo')?'instance-heart-icon':'instance-custom-icon';
-  return `<img class="${cls}" src="../assets/${selected}" alt="" aria-hidden="true">`;
+  const cls=selected.startsWith('ironsword')?'instance-sword-icon':selected==='heart-emoji.png'?'instance-heart-icon':'instance-custom-icon';
+  return `<img class="${cls}" src="../assets/emojis/${selected}" alt="" aria-hidden="true">`;
+}
+
+function normalizeInstanceIcon(icon){
+  const value=String(icon||'');
+  return legacyInstanceIconNames[value]||value;
 }
 
 function instanceMetaMarkup(instance){
   const loader=String(instance.loader||'Vanilla');
   const logo=loaderLogoAsset(loader);
-  return `<div class="meta instance-meta"><span>${escapeHtml(instance.version||'Unknown')}</span><span aria-hidden="true">·</span><span>${escapeHtml(loader)}</span>${logo?`<img class="fabric-loader-icon" src="../assets/${logo}" alt="" aria-hidden="true">`:''}${instance.official?'<img class="instance-official-badge" src="../assets/official-badge451x451.png" alt="" aria-hidden="true" data-tooltip="By Eclipse">':''}</div>`;
+  return `<div class="meta instance-meta"><span>${escapeHtml(instance.version||'Unknown')}</span><span aria-hidden="true">·</span><span>${escapeHtml(loader)}</span>${logo?`<img class="fabric-loader-icon" src="../assets/${logo}" alt="" aria-hidden="true">`:''}${instance.group?`<span aria-hidden="true">·</span><span>${escapeHtml(instance.group)}</span>`:''}${instance.official?'<img class="instance-official-badge" src="../assets/official-badge451x451.png" alt="" aria-hidden="true" data-tooltip="By Eclipse">':''}</div>`;
+}
+
+function updateCreateInstancePreview(){
+  const loader=selectedCreateLoader();
+  const selectedIcon=$('#newInstanceIcon [data-icon].active')?.dataset.icon||'';
+  const loaderOptions={
+    vanilla:{icon:'vanillalogo428x428.png',quote:'A classic Minecraft experience, just as Mojang made it.'},
+    fabric:{icon:'fabriclogo230x230.png',quote:'A lightweight foundation for a world of mods.'},
+    forge:{icon:'forgelogo275x180.png',quote:'A gateway to expansive, heavily modded adventures.'}
+  };
+  const option=loaderOptions[loader]||loaderOptions.vanilla;
+  const previewSource=selectedIcon?`../assets/emojis/${selectedIcon}`:`../assets/${option.icon}`;
+  $('#createInstancePreviewIcon').innerHTML=`<img src="${previewSource}" alt="">`;
+  const name=$('#newInstanceName').value.trim()||'Create an instance';
+  $('#createInstanceTitle').textContent=name;
+  $('#createInstanceNamePreview').textContent=name;
+  $('#createInstanceLoaderQuote').textContent=option.quote;
 }
 
 function openCreateInstanceDialog(){
@@ -1596,6 +1745,9 @@ function openCreateInstanceDialog(){
   eclipseCustomizationTypingTimer=null;
   $('#newInstanceName').value='';
   $('#newInstanceVersion').value='';
+  $$('#newInstanceLoader [data-loader]').forEach(button=>button.classList.toggle('active',button.dataset.loader==='vanilla'));
+  $$('#newInstanceIcon [data-icon]').forEach(button=>button.classList.toggle('active',button.dataset.icon===''));
+  updateCreateInstancePreview();
   $('#performanceModsToggle').checked=performanceModsEnabledByDefault;
   $('#utilityModsToggle').checked=utilityModsEnabledByDefault;
   $('#addOptiFineToggle').checked=false;
@@ -1964,7 +2116,8 @@ async function createInstance(){
   button.disabled=true;
   error.hidden=true;
   try{
-    const created=await window.eclipse.instances.create({name,version,loader,icon,performanceMods,utilityMods,addOptiFine,useTLSkins});
+    const group=$('#newInstanceGroup').value.trim().replace(/\s+/g,' ');
+    const created=await window.eclipse.instances.create({name,group,version,loader,icon,performanceMods,utilityMods,addOptiFine,useTLSkins});
     instances=await window.eclipse.instances.list();
     closeCreateInstanceDialog();
     selectedInstanceFolder=created.folder;
@@ -2111,12 +2264,39 @@ function showInstanceNotice(message){
   notice._hideTimer=setTimeout(()=>{notice.hidden=true;},3600);
 }
 
+function showModpackImportProgress(title,status='Preparing the imported files…'){
+  clearTimeout(installProgressTimer);
+  const panel=$('#instanceInstallProgress');
+  panel.hidden=false;
+  panel.classList.remove('error','launch-progress');
+  panel.classList.add('indeterminate');
+  $('#instanceFirstLaunchHint').hidden=true;
+  $('#instanceInstallProgressTitle').textContent=title;
+  $('#instanceInstallProgressStatus').hidden=false;
+  $('#instanceInstallProgressStatus').textContent=status;
+  $('#instanceInstallProgressFill').style.width='35%';
+}
+
+function finishModpackImportProgress(error=''){
+  const panel=$('#instanceInstallProgress');
+  panel.classList.remove('indeterminate','launch-progress');
+  panel.classList.toggle('error',Boolean(error));
+  $('#instanceInstallProgressTitle').textContent=error?'Modpack import failed':'Modpack imported';
+  $('#instanceInstallProgressStatus').hidden=false;
+  $('#instanceInstallProgressStatus').textContent=error||'Your modpack is ready to play.';
+  $('#instanceInstallProgressFill').style.width=error?'0%':'100%';
+  clearTimeout(installProgressTimer);
+  installProgressTimer=setTimeout(()=>{panel.hidden=true;panel.classList.remove('error');},error?7000:2200);
+}
+
 function updateInstanceInstallProgress(progress){
   const panel=$('#instanceInstallProgress');
+  const firstLaunchHint=$('#instanceFirstLaunchHint');
   const percent=progress.percent;
   const isLaunch=progress.kind==='launch';
   clearTimeout(installProgressTimer);
   if(progress.phase==='complete'){
+    firstLaunchHint.hidden=true;
     panel.classList.remove('error','indeterminate');
     $('#instanceInstallProgressTitle').textContent=progress.status==='Minecraft started'?'Minecraft started':'Instance ready';
     $('#instanceInstallProgressStatus').textContent=progress.status;
@@ -2125,6 +2305,7 @@ function updateInstanceInstallProgress(progress){
     return;
   }
   panel.hidden=false;
+  firstLaunchHint.hidden=!(isLaunch&&launchingInstanceIsFirstLaunch);
   panel.classList.toggle('launch-progress',isLaunch);
   panel.classList.toggle('error',progress.phase==='error');
   panel.classList.toggle('indeterminate',!isLaunch&&percent==null);
@@ -2176,11 +2357,14 @@ async function launch(folder){
     return;
   }
   launchingInstanceFolder=folder;
+  setLaunchQuickMode(true);
+  launchingInstanceIsFirstLaunch=!(Number(instance.lastPlayed)>0||Number(instance.playtimeMs)>0);
   $('#instanceInstallProgress').hidden=false;
   $('#instanceInstallProgress').classList.remove('error');
   $('#instanceInstallProgress').classList.remove('indeterminate');
   $('#instanceInstallProgress').classList.add('launch-progress');
   $('#instanceInstallProgressTitle').textContent='Preparing Minecraft';
+  $('#instanceFirstLaunchHint').hidden=!launchingInstanceIsFirstLaunch;
   $('#instanceInstallProgressStatus').hidden=true;
   $('#instanceInstallProgressFill').style.width='5%';
   renderInstances();
@@ -2189,12 +2373,15 @@ async function launch(folder){
     await window.eclipse.instances.launch(instance);
     renderInstances(); renderQuick();
   }catch(e){
+    setLaunchQuickMode(false);
     window.eclipse.diagnostics.reportRendererError({kind:'Minecraft launch failure',message:`${instance.name||instance.folder}: ${e.message||e}`,detail:e.stack||''});
     launchingInstanceFolder=null;
+    launchingInstanceIsFirstLaunch=false;
     $('#instanceInstallProgress').hidden=false;
     $('#instanceInstallProgress').classList.add('error');
     $('#instanceInstallProgressStatus').hidden=false;
     $('#instanceInstallProgressTitle').textContent='Minecraft could not start';
+    $('#instanceFirstLaunchHint').hidden=true;
     $('#instanceInstallProgressStatus').textContent=e.message;
     clearTimeout(installProgressTimer);
     installProgressTimer=setTimeout(()=>{$('#instanceInstallProgress').hidden=true;},8000);
@@ -2204,7 +2391,15 @@ async function launch(folder){
   }
 }
 
+function formatMinecraftExitCode(code){
+  if(!Number.isInteger(code))return String(code);
+  const unsigned=code>>>0;
+  const signed=unsigned>=0x80000000?unsigned-0x100000000:unsigned;
+  return signed<0?`${signed} (0x${unsigned.toString(16).toUpperCase().padStart(8,'0')})`:String(signed);
+}
+
 function updateLaunchStatus(status){
+  if(status.state==='failed'||status.state==='closed')setLaunchQuickMode(false);
   const instance=instances.find(item=>item.folder===status.folder);
   if(instance){
     if(Number.isFinite(status.playtimeMs))instance.playtimeMs=status.playtimeMs;
@@ -2219,6 +2414,8 @@ function updateLaunchStatus(status){
   }
   if(status.state==='playing'){
     launchingInstanceFolder=null;
+    launchingInstanceIsFirstLaunch=false;
+    $('#instanceFirstLaunchHint').hidden=true;
     playingInstanceFolder=status.folder;
     $('#instanceInstallProgress').hidden=true;
     renderInstances();
@@ -2230,13 +2427,14 @@ function updateLaunchStatus(status){
     const wasPlaying=playingInstanceFolder===status.folder;
     const wasLoading=launchingInstanceFolder===status.folder;
     launchingInstanceFolder=null;
+    launchingInstanceIsFirstLaunch=false;
     playingInstanceFolder=null;
     $('#instanceInstallProgress').hidden=true;
     renderInstances();
     renderQuick();
     renderPlaytimeSettings();
     if(status.state==='failed')showInstanceNotice(`Minecraft could not start: ${status.message||'Unknown launch error.'}`);
-    else if((wasPlaying||wasLoading)&&status.code!=null&&status.code!==0)showInstanceNotice(`Minecraft closed with exit code ${status.code}. Check the instance's latest.log for details.`);
+    else if((wasPlaying||wasLoading)&&status.code!=null&&status.code!==0)showInstanceNotice(`Minecraft closed with exit code ${formatMinecraftExitCode(status.code)}. Check the instance's latest.log or crash report for details.`);
   }
 }
 
@@ -2316,7 +2514,10 @@ $$('.nav').forEach(b=>b.onclick=()=>{
     if(b.dataset.page==='profile')requestAnimationFrame(skinViewer.resize);
   }
   if(b.dataset.page==='mods')refreshCurrentInstalledContent();
-  if(b.dataset.page==='settings')refreshDiagnosticLogs();
+  if(b.dataset.page==='settings'){
+    diagnosticAutoScroll=true;
+    refreshDiagnosticLogs();
+  }
   clearTimeout(pageAnimationTimer);
   if(pageAnimationDuration>0){
     void nextPage.offsetWidth;
@@ -2325,14 +2526,36 @@ $$('.nav').forEach(b=>b.onclick=()=>{
   }
 });
 
-$('#diagnosticLogSelect').onchange=readSelectedDiagnosticLog;
-$('#refreshDiagnosticLogs').onclick=()=>refreshDiagnosticLogs(true);
+$('#diagnosticLogSelect').onchange=()=>{
+  diagnosticAutoScroll=true;
+  readSelectedDiagnosticLog();
+};
+$('#refreshDiagnosticLogs').onclick=()=>{
+  diagnosticAutoScroll=true;
+  refreshDiagnosticLogs(true);
+};
 $('#copyDiagnosticLog').onclick=async()=>{
   try{
     await navigator.clipboard.writeText($('#diagnosticLog').textContent||'');
     $('#diagnosticLogStatus').textContent='Log copied to the clipboard.';
   }catch(error){$('#diagnosticLogStatus').textContent=`Could not copy the log: ${error.message}`;}
 };
+async function deleteCrashReportFromDropdown(id){
+  const entry=diagnosticLogEntries.find(item=>item.id===id&&item.source==='crash');
+  if(!entry)return;
+  if(!window.confirm(`Permanently delete this crash report?\n\n${entry.label}`))return;
+  const dropdown=$('.diagnostics-log-select');
+  dropdown.classList.remove('open');
+  $('#diagnosticLogSelectTrigger').setAttribute('aria-expanded','false');
+  try{
+    diagnosticAutoScroll=true;
+    await window.eclipse.diagnostics.deleteCrashReport(entry.id);
+    await refreshDiagnosticLogs(false);
+    $('#diagnosticLogStatus').textContent=`Deleted crash report: ${entry.label}`;
+  }catch(error){
+    $('#diagnosticLogStatus').textContent=`Could not delete the crash report: ${error.message}`;
+  }
+}
 
 $('#search').oninput=renderInstances;
 $('#sort').onchange=renderInstances;
@@ -2346,11 +2569,43 @@ $('#changeBg').onclick=async()=>{
   const selected=await window.eclipse.background.choose();
   if(selected?.url) setBackgroundImage(selected.url);
 };
-$('#theme').onchange=async e=>{
-  document.body.classList.toggle('light',e.target.value==='light');
-  if(currentBackgroundImageUrl)setBackgroundImage(currentBackgroundImageUrl);
-  await window.eclipse.settings.set({theme:e.target.value});
+function previewAppearanceControls(){
+  const glass=Number($('#glassStrength').value),blur=Number($('#backgroundBlur').value),performance=$('#performanceMode').checked;
+  quickLaunchLevel=$('#quickLaunchLevel').value;
+  document.body.style.setProperty('--glass-alpha',(1-glass/100*.82).toFixed(2));
+  document.body.style.setProperty('--glass-blur',`${performance?0:blur}px`);
+  document.body.classList.toggle('performance-mode',performance);
+  document.body.classList.toggle('quick-launch-paused',quickLaunchActive&&quickLaunchLevel==='min');
+  document.body.classList.toggle('quick-launch-max',quickLaunchActive&&quickLaunchLevel==='max');
+  $('#glassStrengthValue').textContent=`${glass}%`;
+  $('#backgroundBlurValue').textContent=`${blur} px`;
+  $('#appearanceControls').classList.toggle('locked',performance);
+  syncAmbientBackgroundPlayback();
+}
+async function saveAppearance(patch){
+  try{const settings=await window.eclipse.settings.set(patch);applyAppearanceSettings(settings);}
+  catch(error){showInstanceNotice(`Could not save appearance settings: ${error.message}`);}
+}
+$('#appearanceControls').addEventListener('click',event=>{
+  const button=event.target.closest('[data-accent]');
+  if(!button||$('#performanceMode').checked)return;
+  $('#customAccentColor').value=button.dataset.accent;
+  document.body.style.setProperty('--eclipse-accent',button.dataset.accent);
+  saveAppearance({accentColor:button.dataset.accent});
+});
+$('#customAccentColor').oninput=event=>{
+  if($('#performanceMode').checked)return;
+  document.body.style.setProperty('--eclipse-accent',event.target.value);
+  $$('[data-accent]').forEach(button=>button.classList.toggle('selected',button.dataset.accent===event.target.value));
+  event.target.closest('.custom-accent').classList.add('selected');
 };
+$('#customAccentColor').onchange=event=>{if(!$('#performanceMode').checked)saveAppearance({accentColor:event.target.value});};
+$('#glassStrength').oninput=previewAppearanceControls;
+$('#glassStrength').onchange=event=>saveAppearance({glassStrength:Number(event.target.value)});
+$('#backgroundBlur').oninput=previewAppearanceControls;
+$('#backgroundBlur').onchange=event=>saveAppearance({backgroundBlur:Number(event.target.value)});
+$('#performanceMode').onchange=event=>{previewAppearanceControls();saveAppearance({performanceMode:event.target.checked});};
+$('#quickLaunchLevel').onchange=event=>{previewAppearanceControls();saveAppearance({quickLaunchLevel:event.target.value});};
 $('#animationSpeed').onchange=async e=>{
   const speed=e.target.value;
   setAnimationSpeed(speed);
@@ -2360,6 +2615,72 @@ $('#playAnimationSpeed').onchange=async e=>{
   const speed=e.target.value;
   setPlayAnimationSpeed(speed);
   await window.eclipse.settings.set({playAnimationSpeed:speed});
+};
+$('#launchAction').onchange=async e=>{
+  const previous=launchAction;
+  try{
+    const settings=await window.eclipse.settings.set({launchAction:e.target.value});
+    launchAction=settings.launchAction||'hide';
+    e.target.value=launchAction;
+    syncCustomDropdown('launchAction');
+  }catch(error){
+    e.target.value=launchAction=previous;
+    syncCustomDropdown('launchAction');
+    showInstanceNotice(`Could not save the launch action: ${error.message}`);
+  }
+};
+function renderMemoryAllocationValue(){
+  const value=Number($('#memoryAllocation').value);
+  $('#memoryAllocationValue').textContent=value>=1024&&value%1024===0?`${value/1024} GB`:`${(value/1024).toFixed(1)} GB`;
+}
+$('#memoryAllocation').oninput=renderMemoryAllocationValue;
+$('#memoryAllocation').onchange=async e=>{
+  const previous=memoryAllocationMb;
+  try{
+    const settings=await window.eclipse.settings.set({memoryAllocationMb:Number(e.target.value)});
+    memoryAllocationMb=settings.memoryAllocationMb;
+    e.target.value=String(memoryAllocationMb);
+    e.target.max=String(settings.memoryAllocationMaxMb);
+    renderMemoryAllocationValue();
+  }catch(error){
+    e.target.value=String(previous);
+    renderMemoryAllocationValue();
+    showInstanceNotice(`Could not save RAM allocation: ${error.message}`);
+  }
+};
+async function saveMinecraftResolution(){
+  const width=Number($('#minecraftResolutionWidth').value);
+  const height=Number($('#minecraftResolutionHeight').value);
+  if(!Number.isInteger(width)||width<320||width>7680||!Number.isInteger(height)||height<240||height>4320){
+    showInstanceNotice('Resolution must be between 320×240 and 7680×4320 pixels.');
+    $('#minecraftResolutionWidth').value=String(minecraftResolutionWidth);
+    $('#minecraftResolutionHeight').value=String(minecraftResolutionHeight);
+    return;
+  }
+  try{
+    const settings=await window.eclipse.settings.set({minecraftResolutionWidth:width,minecraftResolutionHeight:height});
+    minecraftResolutionWidth=settings.minecraftResolutionWidth;
+    minecraftResolutionHeight=settings.minecraftResolutionHeight;
+    $('#minecraftResolutionWidth').value=String(minecraftResolutionWidth);
+    $('#minecraftResolutionHeight').value=String(minecraftResolutionHeight);
+  }catch(error){
+    $('#minecraftResolutionWidth').value=String(minecraftResolutionWidth);
+    $('#minecraftResolutionHeight').value=String(minecraftResolutionHeight);
+    showInstanceNotice(`Could not save Minecraft resolution: ${error.message}`);
+  }
+}
+$('#minecraftResolutionWidth').onchange=saveMinecraftResolution;
+$('#minecraftResolutionHeight').onchange=saveMinecraftResolution;
+$('#minecraftFullscreen').onchange=async e=>{
+  const previous=minecraftFullscreen;
+  try{
+    const settings=await window.eclipse.settings.set({minecraftFullscreen:e.target.checked});
+    minecraftFullscreen=settings.minecraftFullscreen===true;
+    e.target.checked=minecraftFullscreen;
+  }catch(error){
+    e.target.checked=minecraftFullscreen=previous;
+    showInstanceNotice(`Could not save fullscreen setting: ${error.message}`);
+  }
 };
 $('#showPlaytimeToggle').onchange=async e=>{
   try{
@@ -2429,13 +2750,33 @@ $('#showQuickLaunchToggle').onchange=async e=>{
     showInstanceNotice(`Could not save the Quick Launch setting: ${error.message}`);
   }
 };
-$('#accountCard').onclick=()=>$('#statusPop').classList.toggle('open');
+const statusPop=$('#statusPop');
+function closeAccountStatus(){
+  statusPop.classList.remove('open');
+  statusPop.setAttribute('aria-hidden','true');
+  $('#accountCard').setAttribute('aria-expanded','false');
+}
+$('#accountCard').setAttribute('aria-haspopup','true');
+$('#accountCard').setAttribute('aria-expanded','false');
+$('#accountCard').onclick=()=>{
+  const open=!statusPop.classList.contains('open');
+  statusPop.classList.toggle('open',open);
+  statusPop.setAttribute('aria-hidden',String(!open));
+  $('#accountCard').setAttribute('aria-expanded',String(open));
+};
+document.addEventListener('click',event=>{
+  if(!statusPop.contains(event.target)&&!$('#accountCard').contains(event.target)) closeAccountStatus();
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&statusPop.classList.contains('open')) closeAccountStatus();});
 $$('[data-status]').forEach(x=>x.onclick=async()=>{
   const status=x.dataset.status;
-  const s=await window.eclipse.settings.get();
-  s.profile.status=status;
-  await window.eclipse.settings.set({profile:s.profile});
-  updateStatusUI(status); $('#statusPop').classList.remove('open');
+  try{
+    const s=await window.eclipse.settings.get();
+    s.profile.status=status;
+    await window.eclipse.settings.set({profile:s.profile});
+    updateStatusUI(status);
+    closeAccountStatus();
+  }catch(error){showInstanceNotice(`Could not update account status: ${error.message}`);}
 });
 $$('[data-window]').forEach(b=>b.onclick=()=>{
   const a=b.dataset.window;
@@ -2443,10 +2784,16 @@ $$('[data-window]').forEach(b=>b.onclick=()=>{
 });
 $('#addProfileBtn').onclick=()=>{
   $('#profileCreator').hidden=false;
-  setAccountType('offline');
-  $('#offlineProfileName').focus();
+  $('#microsoftCallbackStep').hidden=true;
+  $('#microsoftCallbackUrl').value='';
+  setAccountType(lastAccountType,false);
+  (lastAccountType==='offline'?$('#offlineProfileName'):$('#loginMicrosoft')).focus();
 };
-$('#cancelAddProfile').onclick=()=>$('#profileCreator').hidden=true;
+$('#cancelAddProfile').onclick=()=>{
+  $('#profileCreator').hidden=true;
+  $('#microsoftCallbackStep').hidden=true;
+  $('#microsoftCallbackUrl').value='';
+};
 $$('[data-account-type]').forEach(button=>button.onclick=()=>setAccountType(button.dataset.accountType));
 $('#createOfflineProfile').onclick=async()=>{
   const button=$('#createOfflineProfile');
@@ -2465,17 +2812,26 @@ $('#loginMicrosoft').onclick=async()=>{
   button.disabled=true;
   showAccountMessage('Opening Microsoft sign-in in your browser…');
   try{
-    const updated=await window.eclipse.accounts.loginMicrosoft($('#microsoftClientId').value);
-    renderProfiles(updated);
-    applySettings(updated);
-    $('#profileCreator').hidden=true;
-    showAccountMessage('Microsoft account added.');
+    await window.eclipse.accounts.beginMicrosoftLogin();
+    $('#microsoftCallbackStep').hidden=false;
+    $('#microsoftCallbackUrl').focus();
+    showAccountMessage('Sign in in your browser, then paste the full redirect URL here.');
   }catch(error){showAccountMessage(error.message,true);}
   finally{button.disabled=false;}
 };
-$('#openEntraPortal').onclick=async event=>{
-  event.preventDefault();
-  await window.eclipse.accounts.openRegistration();
+$('#completeMicrosoftLogin').onclick=async()=>{
+  const button=$('#completeMicrosoftLogin');
+  button.disabled=true;
+  showAccountMessage('Finishing Microsoft and Minecraft sign-in…');
+  try{
+    const updated=await window.eclipse.accounts.completeMicrosoftLogin($('#microsoftCallbackUrl').value);
+    renderProfiles(updated);
+    applySettings(updated);
+    $('#profileCreator').hidden=true;
+    $('#microsoftCallbackUrl').value='';
+    $('#microsoftCallbackStep').hidden=true;
+  }catch(error){showAccountMessage(error.message,true);}
+  finally{button.disabled=false;}
 };
 $('#removeProfileCancel').onclick=closeRemoveProfileDialog;
 $('#resetPlaytimeCancel').onclick=closeResetPlaytimeDialog;
@@ -2499,6 +2855,7 @@ $('#newInstanceName').oninput=()=>{
   createErrorTypingTimer=null;
   $('#createInstanceError').hidden=true;
   $('#createInstanceError').classList.remove('typing-error');
+  updateCreateInstancePreview();
 };
 $('#newInstanceLoader').onclick=event=>{
   const button=event.target.closest('[data-loader]');
@@ -2507,6 +2864,8 @@ $('#newInstanceLoader').onclick=event=>{
   eclipseCustomizationOptionSequence++;
   typeEclipseCustomizationNotice('');
   $$('#newInstanceLoader [data-loader]').forEach(option=>option.classList.toggle('active',option===button));
+  $$('#newInstanceIcon [data-icon]').forEach(option=>option.classList.toggle('active',option.dataset.icon===''));
+  updateCreateInstancePreview();
   $('#addOptiFineToggle').checked=false;
   $('#useTLSkinsToggle').checked=button.dataset.loader==='vanilla'?false:tlSkinsEnabledByDefault;
   $('#useTLSkinsToggle').disabled=true;
@@ -2579,6 +2938,51 @@ $('#newInstanceIcon').onclick=event=>{
   const button=event.target.closest('[data-icon]');
   if(!button)return;
   $$('#newInstanceIcon [data-icon]').forEach(option=>option.classList.toggle('active',option===button));
+  updateCreateInstancePreview();
+};
+$('#importModpackButton').onclick=async()=>{
+  const button=$('#importModpackButton');
+  let importStarted=false;
+  button.disabled=true;
+  try{
+    const folder=await window.eclipse.instances.chooseModpack();
+    if(!folder)return;
+    $('#addEclipseThemeToggle').checked=true;
+    $('#importModpackDialog').hidden=false;
+    const mode=await new Promise(resolve=>{
+      const finish=value=>{$('#importModpackDialog').hidden=true;resolve(value);};
+      $('#importModpackCopy').onclick=()=>finish('copy');
+      $('#importModpackMove').onclick=()=>finish('move');
+      $('#importModpackCancel').onclick=()=>finish(null);
+      $('#importModpackDialog').onclick=event=>{if(event.target.id==='importModpackDialog')finish(null);};
+    });
+    if(!mode)return;
+    closeCreateInstanceDialog();
+    importStarted=true;
+    showModpackImportProgress('Importing modpack…');
+    const imported=await window.eclipse.instances.importModpack(folder,mode,$('#addEclipseThemeToggle').checked);
+    if(!imported){finishModpackImportProgress('The import was cancelled.');return;}
+    instances=await window.eclipse.instances.list();
+    selectedInstanceFolder=imported.folder;
+    renderInstances();
+    renderQuick();
+    renderPlaytimeSettings();
+    installedModsCache=[];
+    installedModsCacheFolder=null;
+    installedModsCacheFailed=false;
+    installedAssetCaches.resourcepack=[];
+    installedAssetCaches.shader=[];
+    installedAssetCacheFolders.resourcepack=null;
+    installedAssetCacheFolders.shader=null;
+    setupModsPage();
+    if(activeModsTab==='installed')refreshCurrentInstalledContent();
+    finishModpackImportProgress();
+    const themeNotice=imported.eclipseThemeStatus==='unavailable'?' Eclipse Theme isn’t available for this modpack version or loader.':imported.eclipseThemeStatus==='already-present'?' FancyMenu is already included, so Eclipse Theme files were skipped.':'';
+    showInstanceNotice(`${imported.sourceRetained?'Your modpack has been imported, but the original file could not be removed.':'Your modpack has been imported!'}${themeNotice}`);
+  }catch(error){
+    if(importStarted)finishModpackImportProgress(error.message||'Unknown error.');
+    showInstanceNotice(`Could not import the modpack: ${error.message}`);
+  }finally{button.disabled=false;}
 };
 $('#resetPlaytimeDialog').onclick=event=>{
   if(event.target.id==='resetPlaytimeDialog')closeResetPlaytimeDialog();
@@ -2617,7 +3021,8 @@ $('#renameInstanceSave').onclick=async()=>{
   button.disabled=true;
   try{
     const previousFolder=renameInstanceTarget.folder;
-    const renamed=await window.eclipse.instances.rename(previousFolder,name,renameInstanceIcon);
+    const group=$('#renameInstanceGroup').value.trim().replace(/\s+/g,' ');
+    const renamed=await window.eclipse.instances.rename(previousFolder,name,renameInstanceIcon,group);
     instances=await window.eclipse.instances.list();
     if(selectedInstanceFolder===previousFolder)selectedInstanceFolder=renamed.folder;
     if(savedModsInstanceFolder===previousFolder)savedModsInstanceFolder=renamed.folder;
@@ -2660,7 +3065,6 @@ setupCustomDropdowns();
 setupAppTooltips();
 window.eclipse.instances.onInstallProgress(updateInstanceInstallProgress);
 window.eclipse.instances.onLaunchStatus(updateLaunchStatus);
-window.eclipse.mods.onInstallProgress(updateModInstallProgress);
 window.addEventListener('error',event=>window.eclipse.diagnostics.reportRendererError({kind:'uncaught error',message:event.message||'Uncaught renderer error',detail:event.error?.stack||`${event.filename||''}:${event.lineno||0}`}));
 window.addEventListener('unhandledrejection',event=>window.eclipse.diagnostics.reportRendererError({kind:'unhandled rejection',message:event.reason?.message||String(event.reason||'Unhandled promise rejection'),detail:event.reason?.stack||''}));
 init();

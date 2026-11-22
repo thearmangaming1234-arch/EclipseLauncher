@@ -1,13 +1,14 @@
 {
   "name": "eclipse-launcher",
-  "version": "0.10.30",
+  "version": "1.23.71",
   "description": "Eclipse Minecraft Launcher",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "dist": "node build/build-update-screen.js && electron-builder --publish never"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "extract-zip": "2.0.1",
     "minecraft-launcher-core": "^3.18.2",
     "skinview3d": "3.4.2",
@@ -20,16 +21,49 @@
   "build": {
     "appId": "com.eclipse.launcher",
     "productName": "Eclipse Launcher",
+    "publish": {
+      "provider": "github",
+      "owner": "eclipse-launcher",
+      "repo": "eclipse-launcher.github.io",
+      "releaseType": "release"
+    },
     "files": [
       "src/**/*",
       "assets/**/*",
       "instances/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "build/EclipseUpdateScreen.exe",
+        "to": "EclipseUpdateScreen.exe"
+      },
+      {
+        "from": "assets/eclipse-updating-screen.jpg",
+        "to": "eclipse-updating-screen.jpg"
+      }
+    ],
     "win": {
       "icon": "assets/favicon.ico",
       "target": "nsis",
       "artifactName": "Eclipse-Launcher-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false,
+      "shortcutName": "Eclipse Launcher",
+      "installerIcon": "assets/favicon.ico",
+      "uninstallerIcon": "assets/favicon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "include": "build/installer.nsh",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
     }
   }
 }

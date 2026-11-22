@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <video id="ambientBackground" class="ambient-background" muted loop playsinline preload="metadata" aria-hidden="true">
+    <source src="../assets/galaxy-falling-stars-wuthering-waves-moewalls-com.mp4" type="video/mp4">
+  </video>
+  <div class="ambient-background-shade" aria-hidden="true"></div>
   <div class="titlebar">
     <div class="drag"></div>
     <button data-window="min">—</button><button data-window="max">□</button><button class="close" data-window="close">×</button>
@@ -18,7 +22,7 @@
     <button class="account-card" id="accountCard">
       <span id="avatar" class="skin-head sidebar-skin-head"><span class="skin-initial">S</span><img class="skin-head-base" alt=""><img class="skin-head-hat" alt=""></span>
       <span><b id="accountName">Steve</b><small id="accountState"><i class="status-dot status-online" aria-hidden="true"></i>Online</small></span>
-      <span>›</span>
+      <svg class="account-status-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg>
     </button>
 
     <nav>
@@ -28,14 +32,28 @@
       <button class="nav" data-page="settings">⚙ <span>Settings</span></button>
     </nav>
 
-    <button class="status-pop" id="statusPop">
-      <b>Account status</b>
-      <span data-status="online"><i class="status-dot status-online" aria-hidden="true"></i>Online</span>
-      <span data-status="offline"><i class="status-dot status-offline" aria-hidden="true"></i>Offline</span>
-      <span data-status="dnd"><i class="status-dot status-dnd" aria-hidden="true"></i>Do Not Disturb</span>
-    </button>
+    <div class="status-pop" id="statusPop" role="group" aria-label="Account status" aria-hidden="true">
+      <div class="status-pop-heading"><b>Account status</b><small>Presence are coming soon...</small></div>
+      <button type="button" data-status="online"><i class="status-dot status-online" aria-hidden="true"></i>Online</button>
+      <button type="button" data-status="offline"><i class="status-dot status-offline" aria-hidden="true"></i>Offline</button>
+      <button type="button" data-status="dnd"><i class="status-dot status-dnd" aria-hidden="true"></i>Do Not Disturb</button>
+    </div>
 
-    <div class="version">Eclipse v0.10.30</div>
+    <div class="sidebar-community-links" aria-label="Eclipse community links">
+      <section id="updateCard" class="update-card" hidden aria-live="polite">
+        <div><b>A new version is available</b><small id="updateVersion"></small></div>
+        <button id="updateInstallButton" type="button">Update</button>
+      </section>
+      <button id="discordCommunityLink" class="sidebar-community-link discord-community-link" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 5.5A18.8 18.8 0 0 0 15 4l-.6 1.2a17.4 17.4 0 0 0-4.8 0L9 4a18.8 18.8 0 0 0-4.7 1.5C1.3 9.8.5 14 .9 18.2a19 19 0 0 0 5.8 2.9l1.2-2a12 12 0 0 1-1.9-.9l.5-.4a13.6 13.6 0 0 0 11 0l.5.4a12 12 0 0 1-1.9.9l1.2 2a19 19 0 0 0 5.8-2.9c.5-4.9-.8-9.1-3.4-12.7ZM8.8 14.8c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Zm6.4 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2Z"/></svg>
+        <span>Join the Discord</span>
+      </button>
+      <button id="websiteCommunityLink" class="sidebar-community-link website-community-link" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span>Website</span>
+      </button>
+    </div>
+    <div class="version" id="launcherVersion">Eclipse</div>
   </aside>
 
   <main>
@@ -57,7 +75,7 @@
       </header>
 
       <section id="instanceInstallProgress" class="instance-install-progress" role="status" aria-live="polite" hidden>
-        <div class="instance-install-progress-heading"><strong id="instanceInstallProgressTitle">Installing instance</strong><span id="instanceInstallProgressStatus">Starting…</span></div>
+        <div class="instance-install-progress-heading"><div class="instance-install-progress-title-row"><strong id="instanceInstallProgressTitle">Installing instance</strong><small id="instanceFirstLaunchHint" hidden>First launch might take few minutes</small></div><span id="instanceInstallProgressStatus">Starting…</span></div>
         <div class="instance-install-track"><span id="instanceInstallProgressFill"></span></div>
       </section>
 
@@ -79,7 +97,18 @@
         <aside class="rightbar">
           <div id="friendsBox" class="panel friends"><h3>♧ &nbsp; Friends</h3><div id="friendsList" class="friends-list"><div class="empty">No Friends</div></div></div>
           <div id="quickLaunchPanel" class="panel quick"><h3>ϟ &nbsp; Quick Launch</h3><div id="quickLaunch" class="quick-item"></div></div>
-          <div class="panel background-panel"><h3>▧ &nbsp; Custom Background</h3><div id="backgroundPreview" class="bg-preview"></div><button id="changeBg" type="button">Change Background</button><hr><h3>☾ &nbsp; Theme</h3><div class="custom-select theme-select" data-select="theme"><button id="themeDropdownTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Theme" aria-controls="themeDropdownMenu" aria-expanded="false"><span class="custom-select-value">Dark</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="themeDropdownMenu" class="custom-select-menu" role="listbox" aria-label="Theme"><button class="custom-select-option selected" type="button" role="option" data-value="dark" aria-selected="true" tabindex="-1">Dark</button><button class="custom-select-option" type="button" role="option" data-value="light" aria-selected="false" tabindex="-1">Light</button></div><select id="theme" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="dark">Dark</option><option value="light">Light</option></select></div></div>
+          <div class="panel background-panel"><h3>▧ &nbsp; Custom Background</h3><div id="backgroundPreview" class="bg-preview"></div><button id="changeBg" type="button">Change Background</button><hr>
+<div class="appearance-controls" id="appearanceControls">
+  <h3>Accent colour</h3><p>Choose a colour for buttons, highlights, and active controls.</p>
+  <div class="accent-colors" role="group" aria-label="Accent colour">
+    <button type="button" data-accent="#963cff" aria-label="Purple" title="Purple" style="--swatch:#963cff"></button><button type="button" data-accent="#e83b55" aria-label="Crimson" title="Crimson" style="--swatch:#e83b55"></button><button type="button" data-accent="#20a56b" aria-label="Green" title="Green" style="--swatch:#20a56b"></button><button type="button" data-accent="#2585ed" aria-label="Blue" title="Blue" style="--swatch:#2585ed"></button><button type="button" data-accent="#ed8b24" aria-label="Orange" title="Orange" style="--swatch:#ed8b24"></button>
+    <label class="custom-accent" title="Custom accent colour"><span>Custom</span><input id="customAccentColor" type="color" value="#963cff" aria-label="Custom accent colour"></label>
+  </div>
+  <label class="appearance-range" for="glassStrength"><span><b>Glass</b><small>How much of the wallpaper shows through.</small></span><input id="glassStrength" type="range" min="0" max="100" value="62"><output id="glassStrengthValue">62%</output></label>
+  <label class="appearance-range" for="backgroundBlur"><span><b>Blur</b><small>How softly the background appears through panels.</small></span><input id="backgroundBlur" type="range" min="0" max="32" value="16"><output id="backgroundBlurValue">16 px</output></label>
+  <label class="performance-mode-toggle" for="performanceMode"><span><b>Performance mode</b><small>Use solid panels, remove blur, and pause the live wallpaper.</small></span><input id="performanceMode" type="checkbox"><i aria-hidden="true"></i></label>
+  <div class="quick-launch-setting"><div class="quick-launch-setting-label"><b>Quick Launch</b><small>Reduce visual effects to help Minecraft start faster.</small></div><div class="custom-select quick-launch-select" data-select="quickLaunchLevel"><button id="quickLaunchLevelTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Quick Launch level" aria-controls="quickLaunchLevelMenu" aria-expanded="false"><span class="custom-select-value">Min</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="quickLaunchLevelMenu" class="custom-select-menu" role="listbox" aria-label="Quick Launch level"><button class="custom-select-option" type="button" role="option" data-value="off" aria-selected="false" tabindex="-1">Off</button><button class="custom-select-option selected" type="button" role="option" data-value="min" aria-selected="true" tabindex="-1">Min</button><button class="custom-select-option" type="button" role="option" data-value="max" aria-selected="false" tabindex="-1">Max</button></div><select id="quickLaunchLevel" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="off">Off</option><option value="min" selected>Min</option><option value="max">Max</option></select></div></div>
+</div></div>
         </aside>
       </div>
     </section>
@@ -99,14 +128,13 @@
         </div>
         <section id="installedModsView" class="mod-section" role="tabpanel" aria-labelledby="installedModsTab">
           <div class="mod-section-heading"><div><h2 id="installedCategoryTitle">Installed mods</h2><p id="installedCategoryDescription">Enable, disable, or remove mods. Pack-included mods are tagged Built-in.</p></div><div class="mod-heading-actions"><button id="openModsFolder" class="mod-refresh-button mod-folder-button" type="button" aria-label="Open selected instance mods folder" title="Open mods folder"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2.25 5.5a1.25 1.25 0 0 1 1.25-1.25h3l1.5 1.5h6.75A1.25 1.25 0 0 1 16 7v6.25a1.25 1.25 0 0 1-1.25 1.25h-11a1.5 1.5 0 0 1-1.5-1.5V5.5Z"/><path d="M2.5 7h13"/></svg></button><button id="refreshMods" class="mod-refresh-button" type="button">↻ Refresh</button></div></div>
-          <div class="installed-mod-tools"><label class="installed-mod-search" for="installedModSearch"><span aria-hidden="true">⌕</span><input id="installedModSearch" type="search" autocomplete="off" placeholder="Search installed mods..."></label><div id="installedModFilters" class="installed-mod-filters" role="group" aria-label="Filter installed mods"><button type="button" class="active" data-mod-filter="all" aria-pressed="true">All</button><button type="button" data-mod-filter="enabled" aria-pressed="false">Enabled</button><button type="button" data-mod-filter="disabled" aria-pressed="false">Disabled</button></div></div>
+          <div class="installed-mod-tools"><label class="installed-mod-search" for="installedModSearch"><span aria-hidden="true">⌕</span><input id="installedModSearch" type="search" autocomplete="off" placeholder="Search installed mods..."></label><div class="installed-mod-controls"><div class="custom-select installed-mod-sort" data-select="installedModSort"><button id="installedModSortTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Sort installed mods: Newest first" aria-controls="installedModSortMenu" aria-expanded="false" title="Sort installed mods"><span class="custom-select-value" aria-hidden="true"></span><svg class="installed-mod-sort-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 11h13m-10 5h10m-7 5h7M4 3v18m0 0-3-3m3 3 3-3"/></svg><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="installedModSortMenu" class="custom-select-menu" role="listbox" aria-label="Sort installed mods"><button class="custom-select-option selected" type="button" role="option" data-value="newest" aria-selected="true" tabindex="-1">Newest to oldest</button><button class="custom-select-option" type="button" role="option" data-value="oldest" aria-selected="false" tabindex="-1">Oldest to newest</button><button class="custom-select-option" type="button" role="option" data-value="name-asc" aria-selected="false" tabindex="-1">Name: A to Z</button><button class="custom-select-option" type="button" role="option" data-value="name-desc" aria-selected="false" tabindex="-1">Name: Z to A</button></div><select id="installedModSort" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="newest">Newest to oldest</option><option value="oldest">Oldest to newest</option><option value="name-asc">Name: A to Z</option><option value="name-desc">Name: Z to A</option></select></div><div id="installedModFilters" class="installed-mod-filters" role="group" aria-label="Filter installed mods"><button type="button" class="active" data-mod-filter="all" aria-pressed="true">All</button><button type="button" data-mod-filter="enabled" aria-pressed="false">Enabled</button><button type="button" data-mod-filter="disabled" aria-pressed="false">Disabled</button></div></div></div>
           <div id="modList" class="mod-card-list"><div class="mod-empty-card">Choose an instance to see its mods.</div></div>
         </section>
         <section id="modrinthView" class="mod-section" role="tabpanel" aria-labelledby="modrinthTab" hidden>
           <div class="mod-section-heading"><div><h2 id="modrinthCategoryTitle">Find mods on Modrinth</h2><p id="modrinthCategoryDescription">Results match this instance’s Minecraft version and mod loader. Required dependencies install automatically.</p></div></div>
           <form id="modSearchForm" class="mod-search-form"><label class="mod-search-input-wrap" for="modSearch"><span aria-hidden="true">⌕</span><input id="modSearch" type="search" maxlength="100" autocomplete="off" placeholder="Search mods..."></label></form>
           <div id="modSearchMessage" class="mod-search-message" role="status" aria-live="polite">Discover popular mods for the selected instance, or search by name.</div>
-          <div id="modInstallProgress" class="mod-install-progress" hidden><div class="mod-install-progress-heading"><span id="modInstallProgressLabel">Preparing mod installation…</span><span id="modInstallProgressPercent"></span></div><div class="mod-install-progress-track"><span id="modInstallProgressFill"></span></div></div>
           <div id="modResults" class="mod-card-list mod-search-results"></div>
           <div id="modDiscoverySentinel" class="mod-discovery-sentinel" hidden><span id="modDiscoverySentinelLabel">Scroll down to load 4 more mods.</span><button id="modDiscoveryLoadMore" class="mod-inline-link" type="button">Load 4 more</button></div>
         </section>
@@ -120,23 +148,26 @@
         <section id="profileCreator" class="profile-creator" hidden>
           <div class="profile-creator-heading"><div><h2>Add an account</h2><p>Offline profiles work locally. Microsoft accounts connect to your owned Minecraft: Java Edition profile.</p></div><button id="cancelAddProfile" class="quiet-button">Close</button></div>
           <div class="account-type-picker">
-            <button class="account-type active" data-account-type="offline"><span class="account-type-icon">◉</span><span><b>Offline</b><small>Choose a local player name</small></span></button>
-            <button class="account-type" data-account-type="microsoft"><span class="account-type-icon">▦</span><span><b>Microsoft</b><small>Sign in through your browser</small></span></button>
+            <button class="account-type active" data-account-type="microsoft"><span class="account-type-icon">▦</span><span><b>Microsoft</b><small>Sign in from your browser</small></span></button>
+            <button class="account-type" data-account-type="offline"><span class="account-type-icon">◉</span><span><b>Offline</b><small>Choose a local player name</small></span></button>
           </div>
-          <div id="offlineAccountForm" class="account-form">
+          <div id="offlineAccountForm" class="account-form" hidden>
             <label for="offlineProfileName">Player name</label>
             <input id="offlineProfileName" maxlength="16" autocomplete="off" placeholder="e.g. Steve">
             <small>1–16 letters, numbers, or underscores.</small>
             <button id="createOfflineProfile" class="primary-button">Create offline profile</button>
           </div>
-          <div id="microsoftAccountForm" class="account-form" hidden>
-            <label for="microsoftClientId">Microsoft app Client ID</label>
-            <input id="microsoftClientId" autocomplete="off" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-            <small>This public ID belongs to Eclipse’s app registration. It is not your Microsoft password or a secret.</small>
-            <button id="loginMicrosoft" class="primary-button">Continue with Microsoft</button>
+          <div id="microsoftAccountForm" class="account-form">
+            <small>Sign in with your Microsoft account in the browser. After sign-in, copy the full address bar URL (even if the page is blank or shows an error) and paste it below to finish.</small>
+            <p class="microsoft-signin-note" role="note">Sorry this sign-in is a little less convenient. I couldn't get an Eclipse Client ID, so you'll need to copy the URL Microsoft returns. Enter your password only on Microsoft's sign-in page.</p>
+            <button id="loginMicrosoft" class="primary-button">Sign in from Browser</button>
+            <div id="microsoftCallbackStep" hidden>
+              <label for="microsoftCallbackUrl">Browser redirect URL</label>
+              <input id="microsoftCallbackUrl" type="url" autocomplete="off" spellcheck="false" placeholder="Paste the full https://login.live.com/... URL">
+              <button id="completeMicrosoftLogin" class="primary-button">Complete Microsoft sign-in</button>
+            </div>
           </div>
           <p id="accountSetupMessage" class="account-setup-message" role="status" aria-live="polite"></p>
-          <p class="client-id-help">Need an app ID? In <a href="https://entra.microsoft.com/" id="openEntraPortal">Microsoft Entra</a>, register an app for personal Microsoft accounts, then add the <b>Mobile and desktop applications</b> platform with <code>http://localhost</code> as its redirect URI. No client secret is needed.</p>
         </section>
         <div id="selectedProfileDetails" class="selected-profile-details"></div>
       </div>
@@ -144,13 +175,13 @@
 
     <section id="settings" class="page"><div class="simple-page"><h1>Settings</h1><p>Customize how Eclipse looks and feels.</p>
       <section class="settings-card"><div class="settings-card-copy"><h2>Animations</h2><p>Choose how quickly pages and interface elements move.</p></div>
-        <label for="animationSpeedTrigger">Animation speed</label>
+        <span class="settings-control-label">Animation speed</span>
         <div class="custom-select animation-select" data-select="animationSpeed">
           <button id="animationSpeedTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Animation speed" aria-controls="animationSpeedMenu" aria-expanded="false"><span class="custom-select-value">Normal</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button>
           <div id="animationSpeedMenu" class="custom-select-menu" role="listbox" aria-label="Animation speed"><button class="custom-select-option" type="button" role="option" data-value="fast" aria-selected="false" tabindex="-1">Fast</button><button class="custom-select-option selected" type="button" role="option" data-value="normal" aria-selected="true" tabindex="-1">Normal</button><button class="custom-select-option" type="button" role="option" data-value="relaxed" aria-selected="false" tabindex="-1">Relaxed</button><button class="custom-select-option" type="button" role="option" data-value="slow" aria-selected="false" tabindex="-1">Slow</button><button class="custom-select-option" type="button" role="option" data-value="off" aria-selected="false" tabindex="-1">Off</button></div>
           <select id="animationSpeed" hidden aria-hidden="true" tabindex="-1"><option value="fast">Fast</option><option value="normal">Normal</option><option value="relaxed">Relaxed</option><option value="slow">Slow</option><option value="off">Off</option></select>
         </div>
-        <label for="playAnimationSpeedTrigger">Play button fade speed</label>
+        <span class="settings-control-label">Play button fade speed</span>
         <div class="custom-select animation-select" data-select="playAnimationSpeed">
           <button id="playAnimationSpeedTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Play button fade speed" aria-controls="playAnimationSpeedMenu" aria-expanded="false"><span class="custom-select-value">Relaxed</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button>
           <div id="playAnimationSpeedMenu" class="custom-select-menu" role="listbox" aria-label="Play button fade speed"><button class="custom-select-option" type="button" role="option" data-value="fast" aria-selected="false" tabindex="-1">Fast</button><button class="custom-select-option" type="button" role="option" data-value="normal" aria-selected="false" tabindex="-1">Normal</button><button class="custom-select-option selected" type="button" role="option" data-value="relaxed" aria-selected="true" tabindex="-1">Relaxed</button><button class="custom-select-option" type="button" role="option" data-value="slow" aria-selected="false" tabindex="-1">Slow</button><button class="custom-select-option" type="button" role="option" data-value="off" aria-selected="false" tabindex="-1">Off</button></div>
@@ -158,9 +189,25 @@
         </div>
         <small>Changes apply immediately and are saved on this device.</small>
       </section>
+      <section class="settings-card"><div class="settings-card-copy"><h2>When Minecraft launches</h2><p>Choose what Eclipse does when the Minecraft game window opens.</p></div>
+        <span class="settings-control-label">Action when launched</span>
+        <div class="custom-select animation-select" data-select="launchAction">
+          <button id="launchActionTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Action when launched" aria-controls="launchActionMenu" aria-expanded="false"><span class="custom-select-value">Hide</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button>
+          <div id="launchActionMenu" class="custom-select-menu" role="listbox" aria-label="Action when launched"><button class="custom-select-option" type="button" role="option" data-value="minimize" aria-selected="false" tabindex="-1">Minimize</button><button class="custom-select-option" type="button" role="option" data-value="close" aria-selected="false" tabindex="-1">Close</button><button class="custom-select-option selected" type="button" role="option" data-value="hide" aria-selected="true" tabindex="-1">Hide</button><button class="custom-select-option" type="button" role="option" data-value="nothing" aria-selected="false" tabindex="-1">Do nothing</button></div>
+          <select id="launchAction" hidden aria-hidden="true" tabindex="-1"><option value="minimize">Minimize</option><option value="close">Close</option><option value="hide">Hide</option><option value="nothing">Do nothing</option></select>
+        </div>
+        <small>Changes apply immediately and are saved on this device.</small>
+      </section>
+      <section class="settings-card game-display-settings-card"><div class="settings-card-copy"><h2>Performance &amp; Display</h2><p>Set how much memory Minecraft can use and the size of its game window.</p></div>
+        <label for="memoryAllocation">RAM allocation</label>
+        <div class="memory-allocation-control"><input id="memoryAllocation" type="range" min="1024" max="4096" step="512" value="4096" aria-describedby="memoryAllocationHelp"><output id="memoryAllocationValue" for="memoryAllocation">4 GB</output></div>
+        <label for="minecraftResolutionWidth">Resolution</label>
+        <div class="resolution-control"><label class="fullscreen-inline-toggle" for="minecraftFullscreen"><input id="minecraftFullscreen" type="checkbox"><span>Fullscreen</span></label><input id="minecraftResolutionWidth" type="number" min="320" max="7680" step="1" value="1280" aria-label="Minecraft window width"><span aria-hidden="true">×</span><input id="minecraftResolutionHeight" type="number" min="240" max="4320" step="1" value="720" aria-label="Minecraft window height"></div>
+        <small id="memoryAllocationHelp">RAM is the maximum heap available to Minecraft. Resolution is the game window width × height in pixels. Changes apply to the next launch.</small>
+      </section>
       <section class="settings-card playtime-settings-card"><div class="settings-card-copy"><h2>Playtime</h2><p>Track time played for each instance and see how your time is split.</p></div>
         <label class="settings-toggle playtime-visibility-toggle" for="showPlaytimeToggle"><span>Show playtime on Home</span><input id="showPlaytimeToggle" type="checkbox" checked></label>
-        <label for="playtimePositionTrigger">Playtime position</label>
+        <span class="settings-control-label">Playtime position</span>
         <div class="custom-select animation-select" data-select="playtimePosition">
           <button id="playtimePositionTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Playtime position" aria-controls="playtimePositionMenu" aria-expanded="false"><span class="custom-select-value">Left of Play button</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button>
           <div id="playtimePositionMenu" class="custom-select-menu" role="listbox" aria-label="Playtime position"><button class="custom-select-option selected" type="button" role="option" data-value="left" aria-selected="true" tabindex="-1">Left of Play button</button><button class="custom-select-option" type="button" role="option" data-value="right" aria-selected="false" tabindex="-1">Right of Play button</button></div>
@@ -186,12 +233,12 @@
         <div id="sidebarOrderList" class="sidebar-order-list"></div>
         <small>Changes apply immediately and are saved on this device.</small>
       </section>
-      <section class="settings-card diagnostics-card"><div class="settings-card-copy"><h2>Logs &amp; Diagnostics</h2><p>Review Eclipse logs, Minecraft logs, and crash reports. Common problems include suggested fixes.</p></div>
-        <div class="diagnostics-controls"><label for="diagnosticLogSelectTrigger">Log source<div class="custom-select animation-select diagnostics-log-select" data-select="diagnosticLogSelect"><button id="diagnosticLogSelectTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Log source" aria-controls="diagnosticLogSelectMenu" aria-expanded="false"><span class="custom-select-value">Refresh to find available logs</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="diagnosticLogSelectMenu" class="custom-select-menu" role="listbox" aria-label="Log source"></div><select id="diagnosticLogSelect" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="">Refresh to find available logs</option></select></div></label><button id="refreshDiagnosticLogs" class="quiet-button" type="button">↻ Refresh</button><button id="copyDiagnosticLog" class="quiet-button" type="button" disabled>Copy log</button></div>
-        <div id="diagnosticFindings" class="diagnostic-findings" role="status" aria-live="polite">Select a log to view details and diagnostic suggestions.</div>
+      <section class="settings-card diagnostics-card"><div class="settings-card-copy"><h2>Logs &amp; Diagnostics</h2><p>View Eclipse and Minecraft logs or crash reports. Select a log to read or copy it.</p></div>
+        <div class="diagnostics-controls"><div class="diagnostic-log-field"><span class="settings-control-label">Log source</span><div class="custom-select animation-select diagnostics-log-select" data-select="diagnosticLogSelect"><button id="diagnosticLogSelectTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Log source" aria-controls="diagnosticLogSelectMenu" aria-expanded="false"><span class="custom-select-value">Refresh to find available logs</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="diagnosticLogSelectMenu" class="custom-select-menu" role="listbox" aria-label="Log source"></div><select id="diagnosticLogSelect" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="">Refresh to find available logs</option></select></div></div><button id="refreshDiagnosticLogs" class="quiet-button" type="button">↻ Refresh</button><button id="copyDiagnosticLog" class="quiet-button" type="button" disabled>Copy log</button></div>
         <pre id="diagnosticLog" class="diagnostic-log" tabindex="0">No log selected.</pre>
         <small id="diagnosticLogStatus">Logs stay on this device. Recent Eclipse errors and available Minecraft log files appear here.</small>
       </section>
+      <section class="settings-card bug-report-card"><div class="settings-card-copy"><h2>Found a bug?</h2><p>Let us know so we can make Eclipse better. Report it in our Discord server.</p></div><button id="reportBugDiscord" class="primary-button" type="button">Report on Discord ↗</button></section>
     </div></section>
   </main>
 
@@ -233,14 +280,21 @@
       </div>
       <label class="rename-instance-label" for="renameInstanceInput">Instance name</label>
       <input id="renameInstanceInput" class="rename-instance-input" maxlength="32" autocomplete="off" spellcheck="false">
+      <label class="rename-instance-label" for="renameInstanceGroup">Group</label>
+      <input id="renameInstanceGroup" class="rename-instance-input" maxlength="32" autocomplete="off" spellcheck="false" placeholder="No group">
       <span class="rename-instance-label">Instance icon</span>
       <div id="renameInstanceIcons" class="create-icon-row rename-instance-icons">
         <button type="button" data-icon=""><span>None</span></button>
-        <button type="button" data-icon="ironsword445x445.png" title="Iron sword"><img src="../assets/ironsword445x445.png" alt="Iron sword"></button>
-        <button type="button" data-icon="heartlogo266x266.png" title="Heart"><img src="../assets/heartlogo266x266.png" alt="Heart"></button>
-        <button type="button" data-icon="hardcore-heart402x402.png" title="Hardcore heart"><img src="../assets/hardcore-heart402x402.png" alt="Hardcore heart"></button>
-        <button type="button" data-icon="hacker-head187x187.png" title="Hacker head"><img src="../assets/hacker-head187x187.png" alt="Hacker head"></button>
-        <button type="button" data-icon="golden-apple144x144.png" title="Golden apple"><img src="../assets/golden-apple144x144.png" alt="Golden apple"></button>
+        <button type="button" data-icon="book-emoji.png" title="Book"><img src="../assets/emojis/book-emoji.png" alt="Book"></button>
+        <button type="button" data-icon="diamond-emoji.png" title="Diamond"><img src="../assets/emojis/diamond-emoji.png" alt="Diamond"></button>
+        <button type="button" data-icon="emerald-emoji.png" title="Emerald"><img src="../assets/emojis/emerald-emoji.png" alt="Emerald"></button>
+        <button type="button" data-icon="enderpearl-emoji.png" title="Ender pearl"><img src="../assets/emojis/enderpearl-emoji.png" alt="Ender pearl"></button>
+        <button type="button" data-icon="goldenapple-emoji.png" title="Golden apple"><img src="../assets/emojis/goldenapple-emoji.png" alt="Golden apple"></button>
+        <button type="button" data-icon="hackerhead-emoji.png" title="Hacker head"><img src="../assets/emojis/hackerhead-emoji.png" alt="Hacker head"></button>
+        <button type="button" data-icon="hardcore-emoji.png" title="Hardcore heart"><img src="../assets/emojis/hardcore-emoji.png" alt="Hardcore heart"></button>
+        <button type="button" data-icon="heart-emoji.png" title="Heart"><img src="../assets/emojis/heart-emoji.png" alt="Heart"></button>
+        <button type="button" data-icon="ironsword-emoji.png" title="Iron sword"><img src="../assets/emojis/ironsword-emoji.png" alt="Iron sword"></button>
+        <button type="button" data-icon="picaxe-emoji.png" title="Pickaxe"><img src="../assets/emojis/picaxe-emoji.png" alt="Pickaxe"></button>
       </div>
       <p id="renameInstanceError" class="confirm-error" hidden></p>
       <div class="confirm-actions">
@@ -285,13 +339,27 @@
       <div class="confirm-actions"><button id="removeModCancel" class="confirm-cancel" type="button">Keep mod</button><button id="removeModConfirm" class="confirm-remove" type="button">Remove mod</button></div>
     </section>
   </div>
-  <div id="createInstanceDialog" class="confirm-overlay" hidden>
+  <div id="createInstanceDialog" class="confirm-overlay create-instance-overlay" hidden>
     <section class="confirm-dialog create-instance-dialog" role="dialog" aria-modal="true" aria-labelledby="createInstanceTitle">
-      <div class="confirm-icon">✦</div>
-      <div class="confirm-copy"><h2 id="createInstanceTitle">Create an instance</h2><p>Choose a name, version, loader, and an icon for your new Minecraft profile.</p></div>
-      <label class="create-instance-field" for="newInstanceName">Instance name<input id="newInstanceName" maxlength="32" autocomplete="off" placeholder="My Minecraft instance"></label>
+      <aside class="create-instance-sidebar">
+        <div class="create-instance-sidebar-eyebrow">New instance</div>
+        <div id="createInstancePreviewIcon" class="create-instance-sidebar-icon" aria-hidden="true"></div>
+        <h2 id="createInstanceNamePreview">Create an instance</h2>
+        <p id="createInstanceLoaderQuote">A classic Minecraft experience, just as Mojang made it.</p>
+        <div class="create-instance-sidebar-options">
+          <button class="create-instance-type upcoming" type="button" disabled><span class="create-instance-type-icon">✦</span><span><b>Eclipse Client</b><small>Coming soon</small></span></button>
+          <div id="newInstanceLoader" class="create-instance-type-list">
+            <button class="create-instance-type active" type="button" data-loader="vanilla"><img src="../assets/vanillalogo428x428.png" alt=""><span><b>Vanilla</b><small>Minecraft as Mojang ships it</small></span></button>
+            <button class="create-instance-type" type="button" data-loader="fabric"><img src="../assets/fabriclogo230x230.png" alt=""><span><b>Fabric</b><small>Lightweight mod loader</small></span><i class="eclipse-customized-star" role="img" aria-label="Eclipse Customized" data-tooltip="Eclipse Customized">✦</i></button>
+            <button class="create-instance-type" type="button" data-loader="forge"><img src="../assets/forgelogo275x180.png" alt=""><span><b>Forge</b><small>Extensive mod support</small></span><i class="eclipse-customized-star" role="img" aria-label="Eclipse Customized" data-tooltip="Eclipse Customized">✦</i></button>
+          </div>
+        </div>
+        <button id="importModpackButton" class="import-modpack-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h6l2 2h8v9H4z"/><path d="M12 11v5m-2-2 2 2 2-2"/></svg><span>Import a modpack…</span></button>
+      </aside>
+      <div class="create-instance-content">
+      <div class="confirm-copy"><h2 id="createInstanceTitle">Create an instance</h2><p>Choose a version and icon for your new Minecraft profile.</p></div>
+      <div class="create-name-group-row"><label class="create-instance-field" for="newInstanceName">Instance name<input id="newInstanceName" maxlength="32" autocomplete="off" placeholder="My Minecraft instance"></label><label class="create-instance-field" for="newInstanceGroup">Group<input id="newInstanceGroup" maxlength="32" autocomplete="off" placeholder="No group"></label></div>
       <div class="create-instance-field"><span id="newInstanceVersionLabel">Minecraft version</span><div class="custom-select version-select" data-select="newInstanceVersion"><button id="newInstanceVersionTrigger" class="custom-select-trigger" type="button" role="combobox" aria-label="Minecraft version" aria-controls="newInstanceVersionMenu" aria-expanded="false"><span class="custom-select-value">Choose a Minecraft version</span><svg class="custom-select-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4 4.5-4"/></svg></button><div id="newInstanceVersionMenu" class="custom-select-menu version-select-menu" role="listbox" aria-labelledby="newInstanceVersionLabel"></div><select id="newInstanceVersion" class="custom-select-native" tabindex="-1" aria-hidden="true" hidden><option value="">Choose a Minecraft version</option></select></div></div>
-      <div class="create-instance-field"><span>Loader</span><div id="newInstanceLoader" class="create-choice-row"><button type="button" class="active" data-loader="vanilla"><img src="../assets/vanillalogo428x428.png" alt="">Vanilla</button><button type="button" data-loader="fabric"><img src="../assets/fabriclogo230x230.png" alt="">Fabric<span class="eclipse-customized-star" role="img" aria-label="Eclipse Customized" data-tooltip="Eclipse Customized">✦</span></button><button type="button" data-loader="forge"><img src="../assets/forgelogo275x180.png" alt="">Forge<span class="eclipse-customized-star" role="img" aria-label="Eclipse Customized" data-tooltip="Eclipse Customized">✦</span></button></div></div>
       <div id="eclipseCustomizationNotice" class="performance-availability customization-notice" role="status" aria-live="polite" hidden></div>
       <div id="performanceOptions" class="create-instance-field performance-settings-field" hidden>
         <span>Optional performance improvements</span>
@@ -328,9 +396,25 @@
           <p class="tl-skin-note">Installs TL Skin &amp; Cape for this version. Using TL skins may require a TL account.</p>
         </div>
       </div>
-      <div class="create-instance-field"><span>Instance icon</span><div id="newInstanceIcon" class="create-icon-row"><button type="button" class="active" data-icon=""><span>None</span></button><button type="button" data-icon="ironsword445x445.png" title="Iron sword"><img src="../assets/ironsword445x445.png" alt="Iron sword"></button><button type="button" data-icon="heartlogo266x266.png" title="Heart"><img src="../assets/heartlogo266x266.png" alt="Heart"></button><button type="button" data-icon="hardcore-heart402x402.png" title="Hardcore heart"><img src="../assets/hardcore-heart402x402.png" alt="Hardcore heart"></button><button type="button" data-icon="hacker-head187x187.png" title="Hacker head"><img src="../assets/hacker-head187x187.png" alt="Hacker head"></button><button type="button" data-icon="golden-apple144x144.png" title="Golden apple"><img src="../assets/golden-apple144x144.png" alt="Golden apple"></button></div></div>
+      <div class="create-instance-field"><span>Instance icon</span><div id="newInstanceIcon" class="create-icon-row"><button type="button" class="active" data-icon=""><span>None</span></button><button type="button" data-icon="book-emoji.png" title="Book"><img src="../assets/emojis/book-emoji.png" alt="Book"></button><button type="button" data-icon="diamond-emoji.png" title="Diamond"><img src="../assets/emojis/diamond-emoji.png" alt="Diamond"></button><button type="button" data-icon="emerald-emoji.png" title="Emerald"><img src="../assets/emojis/emerald-emoji.png" alt="Emerald"></button><button type="button" data-icon="enderpearl-emoji.png" title="Ender pearl"><img src="../assets/emojis/enderpearl-emoji.png" alt="Ender pearl"></button><button type="button" data-icon="goldenapple-emoji.png" title="Golden apple"><img src="../assets/emojis/goldenapple-emoji.png" alt="Golden apple"></button><button type="button" data-icon="hackerhead-emoji.png" title="Hacker head"><img src="../assets/emojis/hackerhead-emoji.png" alt="Hacker head"></button><button type="button" data-icon="hardcore-emoji.png" title="Hardcore heart"><img src="../assets/emojis/hardcore-emoji.png" alt="Hardcore heart"></button><button type="button" data-icon="heart-emoji.png" title="Heart"><img src="../assets/emojis/heart-emoji.png" alt="Heart"></button><button type="button" data-icon="ironsword-emoji.png" title="Iron sword"><img src="../assets/emojis/ironsword-emoji.png" alt="Iron sword"></button><button type="button" data-icon="picaxe-emoji.png" title="Pickaxe"><img src="../assets/emojis/picaxe-emoji.png" alt="Pickaxe"></button></div></div>
       <p id="createInstanceError" class="confirm-error" hidden></p>
       <div class="confirm-actions"><button id="createInstanceCancel" class="confirm-cancel" type="button">Cancel</button><button id="createInstanceSave" class="primary-button" type="button">Create instance</button></div>
+      </div>
+    </section>
+  </div>
+  <div id="importModpackDialog" class="confirm-overlay" hidden>
+    <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="importModpackTitle">
+      <div class="confirm-icon">✦</div><div class="confirm-copy"><h2 id="importModpackTitle">Add this modpack to Eclipse?</h2><p>Choose whether to keep the original folder or transfer it into Eclipse Launcher.</p></div>
+      <label class="settings-toggle import-theme-toggle" for="addEclipseThemeToggle"><span>Add Eclipse Theme</span><input id="addEclipseThemeToggle" type="checkbox" checked></label>
+      <p class="import-theme-note">Note: Eclipse customization isn’t available for Vanilla or some specific versions.</p>
+      <div class="confirm-actions"><button id="importModpackCancel" class="confirm-cancel" type="button">Cancel</button><button id="importModpackCopy" class="quiet-button" type="button">Copy folder</button><button id="importModpackMove" class="primary-button" type="button">Move folder</button></div>
+    </section>
+  </div>
+  <div id="updateChangelogDialog" class="confirm-overlay update-changelog-overlay" hidden>
+    <section class="confirm-dialog update-changelog-dialog" role="dialog" aria-modal="true" aria-labelledby="updateChangelogTitle">
+      <div class="confirm-copy"><h2 id="updateChangelogTitle">Eclipse update complete</h2><p id="updateChangelogVersion"></p></div>
+      <div id="updateChangelogBody" class="update-changelog-body"></div>
+      <div class="confirm-actions"><button id="updateChangelogOkay" class="primary-button" type="button">Okay</button></div>
     </section>
   </div>
   <script src="../assets/vendor/skinview3d.bundle.js"></script>

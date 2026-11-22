@@ -1,10 +1,35 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('eclipse', {
+  app: {
+    version: () => ipcRenderer.invoke('app:version')
+  },
+  community: {
+    open: destination => ipcRenderer.invoke('community:open', destination)
+  },
+  updates: {
+    onAvailable: callback => {
+      const listener = (_, version) => callback(version);
+      ipcRenderer.on('updates:available', listener);
+      return () => ipcRenderer.removeListener('updates:available', listener);
+    },
+    onReady: callback => {
+      const listener = (_, version) => callback(version);
+      ipcRenderer.on('updates:ready', listener);
+      return () => ipcRenderer.removeListener('updates:ready', listener);
+    },
+    install: () => ipcRenderer.invoke('updates:install'),
+    pendingChangelog: () => ipcRenderer.invoke('updates:pending-changelog')
+  },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     maximize: () => ipcRenderer.invoke('window:maximize'),
-    close: () => ipcRenderer.invoke('window:close')
+    close: () => ipcRenderer.invoke('window:close'),
+    onActivity: callback => {
+      const listener = (_, active) => callback(active);
+      ipcRenderer.on('window:activity', listener);
+      return () => ipcRenderer.removeListener('window:activity', listener);
+    }
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
@@ -18,7 +43,8 @@ contextBridge.exposeInMainWorld('eclipse', {
     skinUrl: profileId => ipcRenderer.invoke('profile:skin-url', profileId),
     skinData: profileId => ipcRenderer.invoke('profile:skin-data', profileId),
     downloadSkin: profileId => ipcRenderer.invoke('profile:download-skin', profileId),
-    loginMicrosoft: clientId => ipcRenderer.invoke('accounts:login-microsoft', clientId),
+    beginMicrosoftLogin: () => ipcRenderer.invoke('accounts:begin-microsoft-login'),
+    completeMicrosoftLogin: callbackUrl => ipcRenderer.invoke('accounts:complete-microsoft-login', callbackUrl),
     openRegistration: () => ipcRenderer.invoke('accounts:open-registration')
   },
   background: {
@@ -32,6 +58,8 @@ contextBridge.exposeInMainWorld('eclipse', {
     eclipseCustomizationOptions: (version, loader) => ipcRenderer.invoke('eclipse-customization:options', version, loader),
     tlSkinOptions: (version, loader) => ipcRenderer.invoke('tlskins:options', version, loader),
     create: options => ipcRenderer.invoke('instance:create', options),
+    chooseModpack: () => ipcRenderer.invoke('instance:choose-modpack'),
+    importModpack: (folder, mode, addEclipseTheme) => ipcRenderer.invoke('instance:import-modpack', folder, mode, addEclipseTheme),
     install: folder => ipcRenderer.invoke('instance:install', folder),
     deleteFiles: folder => ipcRenderer.invoke('instance:delete-files', folder),
     resetPlaytime: folder => ipcRenderer.invoke('instance:reset-playtime', folder),
@@ -45,7 +73,7 @@ contextBridge.exposeInMainWorld('eclipse', {
       ipcRenderer.on('instance:launch-status', listener);
       return () => ipcRenderer.removeListener('instance:launch-status', listener);
     },
-    rename: (folder, name, icon) => ipcRenderer.invoke('instance:rename', folder, name, icon),
+    rename: (folder, name, icon, group) => ipcRenderer.invoke('instance:rename', folder, name, icon, group),
     launch: instance => ipcRenderer.invoke('instance:launch', instance)
   },
   mods: {
@@ -71,6 +99,7 @@ contextBridge.exposeInMainWorld('eclipse', {
   diagnostics: {
     list: () => ipcRenderer.invoke('diagnostics:list'),
     read: id => ipcRenderer.invoke('diagnostics:read', id),
+    deleteCrashReport: id => ipcRenderer.invoke('diagnostics:delete-crash-report', id),
     reportRendererError: report => ipcRenderer.send('diagnostics:renderer-error', report)
   }
 });
